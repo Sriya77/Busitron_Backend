@@ -8,7 +8,6 @@ async function sendResetPasswordConfirmation(email) {
 			to: email,
 			subject: "Password Changed Successfully",
 			html: `
-              <h2>Hello,</h2>
               <p>Your password has been changed successfully.</p>
               <p>If you did not make this change, please contact our support team immediately.</p>
               <br>

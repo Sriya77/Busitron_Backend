@@ -98,8 +98,8 @@ export const sendContactEmail = asyncHandler(async (req, res, next) => {
     try {
         await transporter.sendMail({
             from: process.env.SUPER_ADMIN_EMAIL,
-            to: process.env.SUPER_ADMIN_EMAIL,
-            subject: "New Business Inquiry – Contact Form Submission",
+            to: email,
+            subject: "New Business Inquiry - Contact Form Submission",
             html: emailContent,
         });
 

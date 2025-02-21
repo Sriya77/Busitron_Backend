@@ -12,7 +12,7 @@ async function sendOtpForValidation(email, otp) {
         <p>Please enter this OTP to verify your account. It is valid for 10 minutes.</p>
         <p>If you did not request this, please ignore this email.</p>
         <br>
-        <p>Regards,<br>Team Ponnana</p>
+        <p>Regards,<br>Team Busitron</p>
       `,
 		};
 		await transporter.sendMail(mailOptions);
