@@ -21,7 +21,7 @@ const companySettingSchema = new Schema({
 	location: [
 		{
 			_id:false,
-			id: { type: Number, required: true }, // Add this field to store unique IDs,
+			id: { type: Number, required: true }, 
 			country: {
 				type: String,
 				required: false,

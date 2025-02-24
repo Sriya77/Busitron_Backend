@@ -2,12 +2,13 @@ import { companySettingModel } from "../models/companySetting.model.js";
 import { asyncHandler } from "../utils/asyncHandle.js";
 import { errorHandler } from "../utils/errorHandle.js";
 import { apiResponse } from "../utils/apiResponse.js";
+import mongoose from "mongoose";
 
 export const companySettings = asyncHandler(async (req, res) => {
 	try {
 		const { companyName, companyEmail, phoneNumber, website } = req.body;
 
-		if (!companyName || !companyEmail || !phoneNumber) {
+		if (!companyName || !companyEmail || !phoneNumber || !website) {
 			throw new errorHandler(400, "All fields are required");
 		}
 
@@ -53,6 +54,10 @@ export const createBusinessAddress = asyncHandler(async (req, res) => {
 		const { country, pinCode, address, city } = req.body;
 		const { companyId } = req.params;
 
+		if (!companyId) {
+			throw new errorHandler(400, "Invalid company ID");
+		}
+
 		if (!country || !pinCode || !address || !city) {
 			throw new errorHandler(400, "All fields are required");
 		}
@@ -89,6 +94,13 @@ export const updateBusinessAddress = asyncHandler(async (req, res) => {
 		const { companyId, id } = req.params;
 		const data = req.body;
 
+		if (!companyId) {
+			throw new errorHandler(400, "Invalid company ID");
+		}
+
+		if (!data.pinCode || !data.address || !data.country || !data.city) {
+			throw new errorHandler(400, "All fields are required");
+		}
 		const businessAddress = await companySettingModel.findById(companyId);
 
 		if (!businessAddress) {
