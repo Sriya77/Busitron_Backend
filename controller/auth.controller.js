@@ -11,31 +11,43 @@ import generateOtp from "../helper/generateOtp.helper.js";
 
 import sendResetPasswordRequest from "../helper/sendResetPasswordRequest.helper.js";
 import sendResetPasswordConfirmation from "../helper/sendResetPasswordConfirmation.helper.js";
+import { uploadToS3 } from "../middlewares/upload.middleware.js";
 
 export const registerUser = asyncHandler(async (req, res) => {
     try {
-        const { email } = req.body;
+        const { email, designation, employeeId, message } = req.body;
         const password = generateRandomPassword();
 
-        if (!email || !password) throw new errorHandler(400, "email or password missing");
+        if (!email || !password || !designation || !employeeId) {
+            throw new errorHandler(400, "Required fields are missing");
+        }
 
         const existedUser = await User.findOne({ email }).select("-password");
-
         if (existedUser) throw new errorHandler(409, "User already exists");
+
+        const existedEmployeeId = await User.findOne({ employeeId });
+        if (existedEmployeeId) throw new errorHandler(409, "Employee ID already exists");
 
         const user = await User.create({
             email,
             password,
+            designation,
+            employeeId,
+            message,
         });
 
         const result = await sendUserCredential(email, password);
 
         if (!result.success) {
-            throw new errorHandler(400, "some thing went wrong");
+            throw new errorHandler(400, "Something went wrong while sending email");
         }
 
         res.status(201).json(
-            new apiResponse(201, { id: user._id, email: email }, "register successfully")
+            new apiResponse(
+                201,
+                { id: user._id, email, designation, employeeId, message },
+                "Registered successfully"
+            )
         );
     } catch (err) {
         throw new errorHandler(500, err.message);
@@ -80,7 +92,7 @@ export const loginUser = asyncHandler(async (req, res) => {
         res.cookie("accessToken", accessToken)
             .cookie("refreshToken", refreshToken)
             .status(200)
-            .json(new apiResponse(200, { id: user._id, email: email }, "Login successful"));
+            .json(new apiResponse(200, user, "Login successful"));
     } catch (error) {
         throw new errorHandler(500, error.message);
     }
@@ -89,6 +101,7 @@ export const loginUser = asyncHandler(async (req, res) => {
 export const otpVerification = asyncHandler(async (req, res) => {
     try {
         const { otp } = req.body;
+
         const user = await User.findById(req.user._id).select("-password");
         if (!user) throw new errorHandler(404, "User not found");
 
@@ -96,33 +109,42 @@ export const otpVerification = asyncHandler(async (req, res) => {
         if (otp !== getOtp) {
             throw new errorHandler(400, "otp is invalid");
         }
-        await User.findByIdAndUpdate(req.user._id, {
+        const otpUser = await User.findByIdAndUpdate(req.user._id, {
             isValid: true,
         });
-        res.status(201).json(new apiResponse(201, null, "otp verified successfully"));
+        res.status(201).json(new apiResponse(201, otpUser, "otp verified successfully"));
     } catch (err) {
         throw new errorHandler(500, err.message);
     }
 });
 
 export const profileUpdate = asyncHandler(async (req, res) => {
-    const { phoneNumber, fullName, avatar, dateOfBirth } = req.body;
+    const { phone, fullName, dob, gender, maritalStatus } = req.body;
 
-    if (!phoneNumber || !fullName || !avatar || !dateOfBirth) {
+    if (!phone || !fullName || !dob || !gender || !maritalStatus) {
         throw new errorHandler(400, "all fields are required");
     }
 
+    let avatarUrl = "";
+    if (req.file) {
+        avatarUrl = await uploadToS3(req.file);
+    }
+
     try {
-        const user = await User.findByIdAndUpdate(
+        await User.findByIdAndUpdate(
             req.user._id,
             {
-                phoneNumber,
+                phoneNumber: phone,
                 name: fullName,
-                avatar,
-                dateOfBirth,
+                avatar: avatarUrl,
+                dateOfBirth: dob,
+                gender,
+                maritalStatus,
             },
             { new: true }
         );
+
+        const user = await User.findByIdAndUpdate(req.user._id, { isValid: true });
 
         res.status(201).json(new apiResponse(201, user, "profile updated successfully"));
     } catch (err) {
@@ -153,11 +175,12 @@ export const isEmailExist = asyncHandler(async (req, res) => {
 export const resendOtp = asyncHandler(async (req, res) => {
     try {
         const user = await User.findById(req.user._id).select("-password");
+
         if (!user) throw new errorHandler(404, "user not found");
         const otp = generateOtp();
 
         await User.findByIdAndUpdate(req.user._id, { otp });
-        const response = await sendOtpForValidation(user.email, { otp });
+        const response = await sendOtpForValidation(user.email, otp);
         if (!response.success) throw new errorHandler(400, "otp not send successfully");
 
         res.status(201).json(new apiResponse(201, null, "otp send successfully"));
@@ -190,4 +213,28 @@ export const forgotPassword = asyncHandler(async (req, res) => {
     } catch (err) {
         throw new errorHandler(500, err.message);
     }
+});
+
+export const logoutUser = asyncHandler(async (req, res) => {
+    await User.findByIdAndUpdate(
+        req.user._id,
+        {
+            $set: {
+                refreshToken: 1,
+            },
+        },
+        {
+            new: true,
+        }
+    );
+    const option = {
+        httpOnly: true,
+        secure: true,
+    };
+
+    return res
+        .status(200)
+        .clearCookie("accessToken", option)
+        .clearCookie("refreshToken", option)
+        .json(new apiResponse(200, {}, "User logout successfully "));
 });
