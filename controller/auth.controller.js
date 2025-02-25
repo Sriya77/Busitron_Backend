@@ -90,10 +90,12 @@ export const loginUser = asyncHandler(async (req, res) => {
             await User.findOneAndUpdate({ email }, { otp }, { new: true, upsert: false });
         }
 
+        const { password: pass, ...rest } = user._doc;
+
         res.cookie("accessToken", accessToken)
             .cookie("refreshToken", refreshToken)
             .status(200)
-            .json(new apiResponse(200, user, "Login successful"));
+            .json(new apiResponse(200, rest, "Login successful"));
     } catch (error) {
         throw new errorHandler(500, error.message);
     }
@@ -130,6 +132,8 @@ export const profileUpdate = asyncHandler(async (req, res) => {
         throw new errorHandler(400, "All fields are required");
     }
 
+    const hashedPassword = await bcrypt.hash(req.body.password, 10);
+
     let avatarUrl = "";
     if (req.file || req.body.profilePic) {
         avatarUrl = await uploadToS3(req.file);
@@ -145,6 +149,8 @@ export const profileUpdate = asyncHandler(async (req, res) => {
                 dateOfBirth: req.body.dob,
                 gender: req.body.gender,
                 maritalStatus: req.body.maritalStatus,
+                password: hashedPassword,
+                address: req.body.address,
             },
             { new: true }
         );
@@ -229,7 +235,7 @@ export const logoutUser = asyncHandler(async (req, res) => {
         req.user._id,
         {
             $set: {
-                refreshToken: 1,
+                refreshToken: null,
             },
         },
         {

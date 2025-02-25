@@ -15,6 +15,10 @@ const userSchema = new Schema(
             lowercase: true,
             trim: true,
         },
+        address: {
+            type: String,
+            required: false,
+        },
         phoneNumber: {
             type: String,
             required: false,
