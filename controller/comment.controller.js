@@ -64,8 +64,7 @@ export const addComment = async (req, res) => {
 			...mentionedEmails,
 		].filter(Boolean);
 
-		if (recipients.length === 0) {
-			console.warn("No valid recipients found for email notification.");
+		if (recipients.length === 0) {;
 			return res
 				.status(400)
 				.json({
