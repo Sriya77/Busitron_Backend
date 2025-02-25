@@ -11,7 +11,7 @@ import generateOtp from "../helper/generateOtp.helper.js";
 
 import sendResetPasswordRequest from "../helper/sendResetPasswordRequest.helper.js";
 import sendResetPasswordConfirmation from "../helper/sendResetPasswordConfirmation.helper.js";
-import { uploadToS3 } from "../middlewares/upload.middleware.js";
+import { uploadToS3 } from "../services/aws.service.js";
 import bcrypt from "bcryptjs";
 
 export const registerUser = asyncHandler(async (req, res) => {
