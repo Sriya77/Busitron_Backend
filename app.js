@@ -16,11 +16,17 @@ app.use(
 );
 
 import authRouter from "./route/auth.route.js";
-import contactRouter from "./route/contact.route.js"; 
+import contactRouter from "./route/contact.route.js";
+import taskRouter from "./route/task.route.js";
+import commentRouter from "./route/comment.route.js"
+
 
 
 app.use("/api/v1/auth", authRouter);
 app.use("/api/v1/contact", contactRouter);
+app.use("/api/v1/task", taskRouter);
+app.use("/api/v1/comment", commentRouter);
+
 
 
 export default app;
