@@ -160,7 +160,6 @@ export const editComment = async (req, res) => {
 		const { description } = req.body;
 		const userId = req.user._id;
 
-		// ✅ Find comment
 		const comment = await Comment.findById(commentId);
 		if (!comment) {
 			return res
@@ -168,7 +167,6 @@ export const editComment = async (req, res) => {
 				.json({ success: false, message: "Comment not found" });
 		}
 
-		// ✅ Check if user is authorized
 		if (comment.userId.toString() !== userId) {
 			return res.status(403).json({
 				success: false,
@@ -176,7 +174,6 @@ export const editComment = async (req, res) => {
 			});
 		}
 
-		// ✅ Check if edit is within 10 minutes
 		const timeDifference = (new Date() - comment.createdAt) / 60000;
 		if (timeDifference > 10) {
 			return res.status(403).json({
@@ -185,7 +182,6 @@ export const editComment = async (req, res) => {
 			});
 		}
 
-		// ✅ Upload new media (if any)
 		let uploadedMedia = [];
 		if (req.files && req.files.length > 0) {
 			uploadedMedia = await Promise.all(
@@ -193,13 +189,11 @@ export const editComment = async (req, res) => {
 			);
 		}
 
-		// ✅ Extract mentioned users
 		const mentionedUsers = await extractMentions(description);
 		const mentionedEmails = mentionedUsers
 			.map((u) => u.email)
 			.filter(Boolean);
 
-		// ✅ If mentions exist, send email first
 		if (mentionedEmails.length > 0) {
 			try {
 				for (let email of mentionedEmails) {
@@ -291,7 +285,6 @@ export const deleteComment = async (req, res) => {
 
 		await Comment.findByIdAndDelete(commentId);
 
-		// Save history
 		await History.create({
 			taskId: comment.taskId,
 			userId,
