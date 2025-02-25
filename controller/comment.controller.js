@@ -87,12 +87,11 @@ export const addComment = async (req, res) => {
 			}
 			emailSent = true;
 		} catch (emailError) {
-			console.error("Email sending failed:", emailError);
 			return res
 				.status(500)
 				.json({
 					success: false,
-					message: "Email notification failed. Comment not saved.",
+					message: `Email notification failed. Comment not saved.: ${emailError}`,
 				});
 		}
 
@@ -120,7 +119,6 @@ export const addComment = async (req, res) => {
 				});
 		}
 	} catch (error) {
-		console.error("Comment error:", error);
 		return res
 			.status(500)
 			.json({
@@ -205,13 +203,12 @@ export const editComment = async (req, res) => {
 					);
 				}
 			} catch (emailError) {
-				console.error("Email sending failed:", emailError);
 				return res
 					.status(500)
 					.json({
 						success: false,
 						message:
-							"Email notification failed. Comment not updated.",
+							`Email notification failed. Comment not updated. : ${emailError}`,
 					});
 			}
 		}
@@ -236,7 +233,6 @@ export const editComment = async (req, res) => {
 			data: comment,
 		});
 	} catch (error) {
-		console.error("Edit comment error:", error);
 		res.status(500).json({
 			success: false,
 			message: "Error updating comment",
@@ -294,7 +290,6 @@ export const deleteComment = async (req, res) => {
 
 		res.status(200).json({ success: true, message: "Comment deleted" });
 	} catch (error) {
-		console.error("Delete comment error:", error);
 		res.status(500).json({
 			success: false,
 			message: "Error deleting comment",
@@ -359,7 +354,6 @@ export const addReply = async (req, res) => {
 					);
 				}
 			} catch (emailError) {
-				console.error("Email sending failed:", emailError);
 				return res
 					.status(500)
 					.json({
@@ -379,7 +373,6 @@ export const addReply = async (req, res) => {
 			data: reply,
 		});
 	} catch (error) {
-		console.error("Reply error:", error);
 		res.status(500).json({
 			success: false,
 			message: "Error adding reply",

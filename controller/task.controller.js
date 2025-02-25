@@ -108,7 +108,6 @@ export const updateTask = async (req, res) => {
     let historyMessages = [];
     let emailsToNotify = new Set();
 
-    // Fetch assigned user's email
     if (task.assignedTo) {
       const assignedUser = await User.findById(task.assignedTo).select("email");
       if (assignedUser) emailsToNotify.add(assignedUser.email);
@@ -162,7 +161,6 @@ export const updateTask = async (req, res) => {
 
     res.status(200).json({ success: true, message: "Task updated", data: task });
   } catch (error) {
-    console.error("Error updating task:", error); 
     res.status(500).json({ success: false, message: "Error updating task", error: error.message });
   }
 };
@@ -204,7 +202,6 @@ export const deleteTask = async (req, res) => {
 
     res.status(200).json({ success: true, message: "Task and associated comments deleted" });
   } catch (error) {
-    console.error("Error deleting task:", error);
     res.status(500).json({ success: false, message: "Error deleting task", error: error.message });
   }
 };
