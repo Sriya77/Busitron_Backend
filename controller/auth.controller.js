@@ -11,7 +11,8 @@ import generateOtp from "../helper/generateOtp.helper.js";
 
 import sendResetPasswordRequest from "../helper/sendResetPasswordRequest.helper.js";
 import sendResetPasswordConfirmation from "../helper/sendResetPasswordConfirmation.helper.js";
-import { uploadToS3 } from "../middlewares/upload.middleware.js";
+import { uploadToS3 } from "../services/aws.service.js";
+import bcrypt from "bcryptjs";
 
 export const registerUser = asyncHandler(async (req, res) => {
     try {
@@ -119,14 +120,18 @@ export const otpVerification = asyncHandler(async (req, res) => {
 });
 
 export const profileUpdate = asyncHandler(async (req, res) => {
-    const { phone, fullName, dob, gender, maritalStatus } = req.body;
-
-    if (!phone || !fullName || !dob || !gender || !maritalStatus) {
-        throw new errorHandler(400, "all fields are required");
+    if (
+        !req.body.phone ||
+        !req.body.fullName ||
+        !req.body.dob ||
+        !req.body.gender ||
+        !req.body.maritalStatus
+    ) {
+        throw new errorHandler(400, "All fields are required");
     }
 
     let avatarUrl = "";
-    if (req.file) {
+    if (req.file || req.body.profilePic) {
         avatarUrl = await uploadToS3(req.file);
     }
 
@@ -134,41 +139,20 @@ export const profileUpdate = asyncHandler(async (req, res) => {
         await User.findByIdAndUpdate(
             req.user._id,
             {
-                phoneNumber: phone,
-                name: fullName,
+                phoneNumber: req.body.phone,
+                name: req.body.fullName,
                 avatar: avatarUrl,
-                dateOfBirth: dob,
-                gender,
-                maritalStatus,
+                dateOfBirth: req.body.dob,
+                gender: req.body.gender,
+                maritalStatus: req.body.maritalStatus,
             },
             { new: true }
         );
 
-        const user = await User.findByIdAndUpdate(req.user._id, { isValid: true });
-
-        res.status(201).json(new apiResponse(201, user, "profile updated successfully"));
+        const user = await User.findById(req.user._id);
+        res.status(201).json(new apiResponse(201, user, "Profile updated successfully"));
     } catch (err) {
         throw new errorHandler(400, err.message);
-    }
-});
-
-export const isEmailExist = asyncHandler(async (req, res) => {
-    try {
-        const { email } = req.body;
-        if (!email) throw new errorHandler(400, "Email must be required");
-
-        const checkMail = await User.findOne({ email }).select("-password");
-        if (!checkMail) throw new errorHandler(400, "Invalid email.");
-
-        const response = await sendResetPasswordRequest(email);
-
-        if (!response.success) {
-            throw new errorHandler(500, "Forgot password mail not send ");
-        }
-
-        res.status(200).json(new apiResponse(200, null, "Forgot password link send Successfully"));
-    } catch (err) {
-        throw new errorHandler(500, err.message);
     }
 });
 
@@ -189,27 +173,52 @@ export const resendOtp = asyncHandler(async (req, res) => {
     }
 });
 
-export const forgotPassword = asyncHandler(async (req, res) => {
+export const isEmailExist = asyncHandler(async (req, res) => {
     try {
-        const { newPassword, conformPassword } = req.body;
-        if (!newPassword || !conformPassword) throw new errorHandler(400, "All fields required");
+        const { email } = req.body;
 
-        if (newPassword !== conformPassword) {
-            throw new errorHandler(400, "newPassword and conformPassword must be same");
+        if (!email) throw new errorHandler(400, "Email must be required");
+
+        const checkMail = await User.findOne({ email }).select("-password");
+        if (!checkMail) throw new errorHandler(400, "Invalid email.");
+
+        const response = await sendResetPasswordRequest(email);
+
+        if (!response.success) {
+            throw new errorHandler(500, "Forgot password mail not send ");
         }
 
-        const user = await User.findById(req.user._id).select("-password");
+        res.status(200).json(new apiResponse(200, null, "Forgot password link send Successfully"));
+    } catch (err) {
+        throw new errorHandler(500, err.message);
+    }
+});
+
+export const forgotPassword = asyncHandler(async (req, res) => {
+    try {
+        const { formData } = req.body;
+
+        const { email, password, confirmPassword } = formData;
+
+        if (!password || !confirmPassword) throw new errorHandler(400, "All fields required");
+
+        if (password !== confirmPassword)
+            throw new errorHandler(400, "Password and confirm password not match");
+
+        const user = await User.findOne({ email });
+
         if (!user) throw new errorHandler(404, "user not found");
 
-        await User.findByIdAndUpdate(req.user._id, { password: newPassword });
+        const salt = await bcrypt.genSalt(10);
+        const hashedPassword = await bcrypt.hash(password, salt);
+
+        await User.findOneAndUpdate({ email: user.email }, { password: hashedPassword });
 
         const response = await sendResetPasswordConfirmation(user.email);
 
-        if (!response.success) {
-            throw new errorHandler(400, "Nodemailer error.");
-        }
+        if (!response.success) throw new errorHandler(400, "Nodemailer error.");
 
-        res.status(200).json(new apiResponse(200, null, "your password changed  Successfully"));
+        res.status(200).json(new apiResponse(200, null, "your password changed Successfully"));
     } catch (err) {
         throw new errorHandler(500, err.message);
     }

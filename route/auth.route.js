@@ -20,13 +20,13 @@ router.post("/login", loginUser);
 
 router.post("/otp", authenticateUser, otpVerification);
 
-router.post("/isEmailExist", authenticateUser, isEmailExist);
-
 router.post("/re-sendOtp", authenticateUser, resendOtp);
 
 router.put("/profileUpdate", authenticateUser, upload, profileUpdate);
 
-router.post("/forgot_password", authenticateUser, forgotPassword);
+router.post("/isEmailExist", isEmailExist);
+
+router.post("/forgot_password", forgotPassword);
 
 router.post("/logout", authenticateUser, logoutUser);
 
