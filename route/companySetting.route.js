@@ -1,6 +1,6 @@
 import express from "express";
 import {
-	companySettings,
+	updateCompanySettings,
 	createBusinessAddress,
 	deleteBusinessAddress,
 	getAllBusinessAddresses,
@@ -11,9 +11,9 @@ import {
 
 const router = express.Router();
 
-router.post("/company_setting", companySettings);
-
 router.get("/company_setting", getCompanySettings);
+
+router.post("/update_company_setting", updateCompanySettings);
 
 router.post("/business_address/:companyId", createBusinessAddress);
 
