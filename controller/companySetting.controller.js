@@ -90,14 +90,15 @@ export const updateBusinessAddress = asyncHandler(async (req, res) => {
         if (country) updateFields["location.$.country"] = country;
         if (pinCode) updateFields["location.$.pinCode"] = pinCode;
 
-        const updatedCompany = await companySettingModel.findOneAndUpdate(
+        await companySettingModel.findOneAndUpdate(
             { _id: companyId, "location.id": Number(id) },
             { $set: updateFields },
             { new: true }
         );
 
+        const companySetting = await companySettingModel.find({});
         res.status(200).json(
-            new apiResponse(200, updatedCompany, "Business address updated successfully")
+            new apiResponse(200, companySetting, "Business address updated successfully")
         );
     } catch (err) {
         throw new errorHandler(500, err.message);
@@ -107,26 +108,21 @@ export const updateBusinessAddress = asyncHandler(async (req, res) => {
 export const deleteBusinessAddress = asyncHandler(async (req, res) => {
     try {
         const { companyId, id } = req.params;
-
-        if (!companyId) {
-            throw new errorHandler(400, "Invalid company ID");
-        }
+        if (!companyId) throw new errorHandler(400, "Invalid company ID");
 
         const company = await companySettingModel.findById(companyId);
-        if (!company) {
-            throw new errorHandler(404, "Company not found");
-        }
+        if (!company) throw new errorHandler(404, "Company not found");
 
         const locationIndex = company.location.findIndex((loc) => loc.id === Number(id));
-
-        if (locationIndex === -1) {
-            throw new errorHandler(404, "Business address not found");
-        }
+        if (locationIndex === -1) throw new errorHandler(404, "Business address not found");
 
         company.location.splice(locationIndex, 1);
         await company.save();
+        const companySetting = await companySettingModel.find({});
 
-        res.status(200).json(new apiResponse(200, null, "Business address deleted successfully"));
+        res.status(200).json(
+            new apiResponse(200, companySetting, "Business address deleted successfully")
+        );
     } catch (err) {
         throw new errorHandler(500, err.message);
     }
