@@ -132,8 +132,6 @@ export const profileUpdate = asyncHandler(async (req, res) => {
         throw new errorHandler(400, "All fields are required");
     }
 
-    const hashedPassword = await bcrypt.hash(req.body.password, 10);
-
     let avatarUrl = "";
     if (req.file || req.body.profilePic) {
         avatarUrl = await uploadToS3(req.file);
@@ -149,7 +147,6 @@ export const profileUpdate = asyncHandler(async (req, res) => {
                 dateOfBirth: req.body.dob,
                 gender: req.body.gender,
                 maritalStatus: req.body.maritalStatus,
-                password: hashedPassword,
                 address: req.body.address,
             },
             { new: true }
