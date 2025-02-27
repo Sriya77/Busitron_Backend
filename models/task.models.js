@@ -15,12 +15,11 @@ const taskSchema = new Schema(
 			enum: ["To Do", "In Progress", "Review", "Complete", "Close"],
 			default: "To Do",
 		},
-		// add the project id and user id
-		// projectId: {
-		// 	type: mongoose.Schema.Types.ObjectId,
-		// 	ref: "Project",
-		// 	required: true,
-		// },
+		projectId: {
+			type: mongoose.Schema.Types.ObjectId,
+			ref: "Project",
+			required: false,
+		},
 		userId: {
 			type: mongoose.Schema.Types.ObjectId,
 			ref: "User",
@@ -39,8 +38,8 @@ const taskSchema = new Schema(
 
 		attachments: [{ type: String }],
 
-		history: [{ type: mongoose.Schema.Types.ObjectId, ref: "History" }],
-		comments: [{ type: mongoose.Schema.Types.ObjectId, ref: "Comment" }],
+		// history: [{ type: mongoose.Schema.Types.ObjectId, ref: "History" }],
+		// comments: [{ type: mongoose.Schema.Types.ObjectId, ref: "Comment" }],
 	},
 	{ timestamps: true }
 );

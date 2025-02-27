@@ -11,16 +11,20 @@ const s3 = new AWS.S3({
 
 const CLOUDFRONT_URL = process.env.AWS_CLOUDFRONT_URL;
 
-const uploadToS3 = async (file) => {
+const uploadToS3 = async (file, folder = "") => {
     if (!file) return;
-    const key = `avatars/${Date.now()}-${file.originalname}`;
+
+    const key = folder
+        ? `avatars/${folder}/${Date.now()}-${file.originalname}`
+        : `avatars/${Date.now()}-${file.originalname}`;
+
     const uploadParams = {
         Bucket: process.env.AWS_S3_BUCKET_NAME,
         Key: key,
         Body: file.buffer,
         ContentType: file.mimetype,
     };
-    await s3.upload(uploadParams).promise();
+     await s3.upload(uploadParams).promise();
     return `${CLOUDFRONT_URL}/${key}`;
 };
 

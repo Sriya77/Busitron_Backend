@@ -8,7 +8,6 @@ const replySchema = new mongoose.Schema(
 			required: true,
 		},
 		description: { type: String, default: "" },
-		media: [{ type: String }], 
 		createdAt: { type: Date, default: Date.now },
 	},
 	{ timestamps: true }

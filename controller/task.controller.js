@@ -1,207 +1,219 @@
-import AWS from "aws-sdk";
+
 import Task from "../models/task.models.js";
 import Comment from "../models/comment.models.js";
 import History from "../models/history.models.js";
 import { User } from "../models/user.models.js";
 import { sendTaskEmail } from "../helper/sendTaskEmail.js";
+import { errorHandler } from "../utils/errorHandle.js";
+import { apiResponse } from "../utils/apiResponse.js";
+import { asyncHandler } from "../utils/asyncHandle.js";
+import {  uploadToS3 } from "../services/aws.service.js";
 
-const s3 = new AWS.S3({
-  accessKeyId: process.env.AWS_ACCESS_KEY_ID,
-  secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
-  region: process.env.AWS_REGION,
+
+
+export const createTask = asyncHandler(async (req, res) => {
+	const { title, description, assignedTo, status, priority, projectId } = req.body;
+	const userId = req.user._id;
+
+	const existingTask = await Task.findOne({ title, projectId });
+	if (existingTask) throw new errorHandler(400, "A task with this title already exists in the project");
+
+	const task = await new Task({
+		title,
+		description,
+		userId,
+		assignedTo,
+		status,
+		priority,
+		projectId,
+	}).save();
+
+	if (req.files?.length) {
+		task.attachments = await Promise.all(req.files.map((file) => uploadToS3(file, `tasks/${task._id}/attachments`)));
+		await task.save();
+	}
+
+	const creator = await User.findById(userId).select("name email");
+	if (!creator) throw new errorHandler(404, "Creator not found");
+
+	let historyMessage = `${creator.name} created the task`;
+
+	if (assignedTo) {
+		const assignedUser = await User.findById(assignedTo).select("name email");
+		if (!assignedUser) throw new errorHandler(404, "Assigned user not found");
+
+		historyMessage = `${creator.name} assigned task to ${assignedUser.name}`;
+
+		await sendTaskEmail(
+			assignedUser.email,
+			"You have been assigned a task",
+			`${creator.name} has assigned you a new task: ${title}`,
+			task._id
+		);
+	}
+
+	await History.create({
+		taskId: task._id,
+		userId,
+		action: "Created",
+		message: historyMessage,
+		changes: [],
+	});
+
+	res.status(201).json(new apiResponse(201, task, "Task created successfully"));
 });
 
-const uploadToS3 = async (file, taskId) => {
-  const key = `tasks/${taskId}/attachments/${Date.now()}-${file.originalname}`;
-  const result = await s3.upload({
-    Bucket: process.env.AWS_S3_BUCKET_TASK,
-    Key: key,
-    Body: file.buffer,
-    ContentType: file.mimetype,
-  }).promise();
-  return result.Location;
-};
 
-export const createTask = async (req, res) => {
-  try {
-    const { title, description, assignedTo, status, priority, projectId } = req.body;
-    const userId = req.user._id;
+export const getTasks = asyncHandler(async (req, res) => {
+	const tasks = await Task.find().populate("userId", "name email").populate("assignedTo", "name email");
 
-    const task = new Task({ title, description, userId, assignedTo, status, priority, projectId });
-    await task.save();
+	if (!tasks.length) throw new errorHandler(404, "No tasks found");
 
-    if (req.files?.length > 0) {
-      task.attachments = await Promise.all(req.files.map((file) => uploadToS3(file, task._id)));
-      await task.save();
-    }
+	res.status(200).json(new apiResponse(200, tasks, "Tasks retrieved successfully"));
+});
 
-    const creator = await User.findById(userId).select("name email");
-    let historyMessage = `${creator.name} created the task`;
+export const getTaskById = asyncHandler(async (req, res) => {
+	const { taskId } = req.params;
 
-    if (assignedTo) {
-      
-      const assignedUser = await User.findById(assignedTo).select("name email");
-      historyMessage = `${creator.name} assigned task to ${assignedUser.name}`;
+	const task = await Task.findById(taskId)
+		.populate("userId", "name email")
+		.populate("assignedTo", "name email");
 
-      await sendTaskEmail(
-        assignedUser.email,
-        "You have been assigned a task",
-        `${creator.name} has assigned you a new task: ${title}`,
-        task._id
-      );
-    }
+	if (!task) throw new errorHandler(404, "Task not found");
 
-    await History.create({
-      taskId: task._id,
-      userId,
-      action: "Created",
-      message: historyMessage,
-      changes: [],
-    });
+	const [comments, history] = await Promise.all([
+		Comment.find({ taskId }).populate("userId", "name email"),
+		History.find({ taskId }).populate("userId", "name email").sort({ createdAt: -1 }),
+	]);
 
-    res.status(201).json({ success: true, message: "Task created", data: task });
-  } catch (error) {
-    res.status(500).json({ success: false, message: "Error creating task", error: error.message });
-  }
-};
+	res.status(200).json(new apiResponse(200, { task, comments, history }, "Task details retrieved successfully"));
+});
 
+export const updateTask = asyncHandler(async (req, res) => {
+	const { taskId } = req.params;
+	const { title, description, assignedTo, status, priority, removedAttachments } = req.body;
+	const userId = req.user._id;
 
+	const task = await Task.findById(taskId);
+	if (!task) throw new errorHandler(404, "Task not found");
 
-export const getTasks = async (req, res) => {
-  try {
-    const tasks = await Task.find().populate("userId", "name email").populate("assignedTo", "name email");
-    res.status(200).json({ success: true, data: tasks });
-  } catch (error) {
-    res.status(500).json({ success: false, message: "Error fetching tasks", error: error.message });
-  }
-};
+	const userChanger = await User.findById(userId).select("name");
+	const userName = userChanger?.name || "Unknown User";
 
-export const getTaskById = async (req, res) => {
-  try {
-    const { taskId } = req.params;
-    const task = await Task.findById(taskId).populate("userId", "name email").populate("assignedTo", "name email");
-    if (!task) return res.status(404).json({ success: false, message: "Task not found" });
+	let changes = [];
+	let historyMessages = [];
+	let emailsToNotify = new Set();
 
-    const comments = await Comment.find({ taskId }).populate("userId", "name email");
-    const history = await History.find({ taskId }).populate("userId", "name email").sort({ createdAt: -1 });
+	if (task.assignedTo) {
+		const assignedUser = await User.findById(task.assignedTo).select("email");
+		if (assignedUser) emailsToNotify.add(assignedUser.email);
+	}
 
-    res.status(200).json({ success: true, task, comments, history });
-  } catch (error) {
-    res.status(500).json({ success: false, message: "Error fetching task", error: error.message });
-  }
-};
+	const updateField = (field, newValue, label) => {
+		if (newValue && newValue !== task[field]) {
+			changes.push({ field, oldValue: task[field], newValue });
+			historyMessages.push(`${userName} updated ${label} from "${task[field]}" to "${newValue}"`);
+			task[field] = newValue;
+		}
+	};
 
+	updateField("title", title, "title");
+	updateField("description", description, "description");
+	updateField("priority", priority, "priority");
+	updateField("status", status, "status");
 
-export const updateTask = async (req, res) => {
-  try {
-    const { taskId } = req.params;
-    const { title, description, assignedTo, status, priority } = req.body;
-    const userId = req.user._id;
+	if (assignedTo && assignedTo !== task.assignedTo?.toString()) {
+		const previousAssignee = task.assignedTo
+			? await User.findById(task.assignedTo).select("name email")
+			: null;
+		const newAssignee = await User.findById(assignedTo).select("name email");
 
-    const task = await Task.findById(taskId);
-    if (!task) return res.status(404).json({ success: false, message: "Task not found" });
+		changes.push({
+			field: "assignedTo",
+			oldValue: previousAssignee?.name || "Unassigned",
+			newValue: newAssignee.name,
+		});
+		historyMessages.push(
+			`${userName} reassigned the task from ${previousAssignee?.name || "Unassigned"} to ${newAssignee.name}`
+		);
 
-    const userChanger = await User.findById(userId).select("name");
-    const userName = userChanger ? userChanger.name : "Unknown User";
+		task.assignedTo = assignedTo;
 
-    let changes = [];
-    let historyMessages = [];
-    let emailsToNotify = new Set();
+		if (previousAssignee?.email) emailsToNotify.add(previousAssignee.email);
+		if (newAssignee?.email) emailsToNotify.add(newAssignee.email);
+	}
 
-    if (task.assignedTo) {
-      const assignedUser = await User.findById(task.assignedTo).select("email");
-      if (assignedUser) emailsToNotify.add(assignedUser.email);
-    }
+	// Handle new file uploads
+	if (req.files?.length) {
+		const newAttachments = await Promise.all(
+			req.files.map((file) => uploadToS3(file, `tasks/${task._id}/attachments`))
+		);
+		task.attachments.push(...newAttachments);
+		historyMessages.push(`${userName} added new attachments.`);
+		changes.push({ field: "attachments", newValue: "Added new files" });
+	}
 
-    if (title && title !== task.title) {
-      changes.push({ field: "title", oldValue: task.title, newValue: title });
-      historyMessages.push(`${userName} updated the title from "${task.title}" to "${title}"`);
-      task.title = title;
-    }
+	if (changes.length > 0) {
+		await task.save();
+		await History.create({
+			taskId: task._id,
+			userId,
+			action: "Updated",
+			message: historyMessages.join(", "),
+			changes,
+		});
 
-    if (description && description !== task.description) {
-      changes.push({ field: "description", oldValue: task.description, newValue: description });
-      historyMessages.push(`${userName} updated the description`);
-      task.description = description;
-    }
+		await Promise.all(
+			[...emailsToNotify].map((email) =>
+				sendTaskEmail(email, "Task Updated", historyMessages.join(", "), task._id)
+			)
+		);
+	}
 
-    if (priority && priority !== task.priority) {
-      changes.push({ field: "priority", oldValue: task.priority, newValue: priority });
-      historyMessages.push(`${userName} changed the priority from "${task.priority}" to "${priority}"`);
-      task.priority = priority;
-    }
-
-    if (status && status !== task.status) {
-      changes.push({ field: "status", oldValue: task.status, newValue: status });
-      historyMessages.push(`${userName} changed the status from "${task.status}" to "${status}"`);
-      task.status = status;
-    }
-
-    if (assignedTo && assignedTo !== task.assignedTo?.toString()) {
-      const previousAssignee = task.assignedTo ? await User.findById(task.assignedTo).select("name email") : null;
-      const newAssignee = await User.findById(assignedTo).select("name email");
-
-      changes.push({ field: "assignedTo", oldValue: previousAssignee?.name || "Unassigned", newValue: newAssignee.name });
-      historyMessages.push(`${userName} reassigned the task from ${previousAssignee?.name || "Unassigned"} to ${newAssignee.name}`);
-      
-      task.assignedTo = assignedTo;
-
-      if (previousAssignee?.email) emailsToNotify.add(previousAssignee.email);
-      if (newAssignee?.email) emailsToNotify.add(newAssignee.email);
-    }
-
-    if (changes.length > 0) {
-      await task.save();
-      await History.create({ taskId: task._id, userId, action: "Updated", message: historyMessages.join(", "), changes });
-
-      for (let email of emailsToNotify) {
-        await sendTaskEmail(email, "Task Updated", historyMessages.join(", "), task._id);
-      }
-    }
-
-    res.status(200).json({ success: true, message: "Task updated", data: task });
-  } catch (error) {
-    res.status(500).json({ success: false, message: "Error updating task", error: error.message });
-  }
-};
+	res.status(200).json(new apiResponse(200, task, "Task updated successfully"));
+});
 
 
 
-export const deleteTask = async (req, res) => {
-  try {
-    const { taskId } = req.params;
-    const userId = req.user._id;
+export const deleteTask = asyncHandler(async (req, res) => {
+	const { taskId } = req.params;
+	const userId = req.user._id;
 
-    const task = await Task.findById(taskId);
-    if (!task) return res.status(404).json({ success: false, message: "Task not found" });
+	const task = await Task.findById(taskId);
+	if (!task) throw new errorHandler(404, "Task not found");
 
-    if (task.userId && task.userId.toString() !== userId) {
-      return res.status(403).json({ success: false, message: "Not authorized" });
-    }
+	if (task.userId && task.userId.toString() !== userId) {
+		throw new errorHandler(403, "Not authorized to delete this task");
+	}
 
-    const user = await User.findById(userId).select("name");
-    const userName = user ? user.name : "Unknown User";
+	const user = await User.findById(userId).select("name");
+	const userName = user?.name || "Unknown User";
 
-    const assignedUser = task.assignedTo ? await User.findById(task.assignedTo).select("email") : null;
+	const assignedUser = task.assignedTo
+		? await User.findById(task.assignedTo).select("email")
+		: null;
 
-    await Comment.deleteMany({ taskId });
+	await Comment.deleteMany({ taskId });
 
-    await Task.findByIdAndDelete(taskId);
+	await Task.findByIdAndDelete(taskId);
 
-    const historyMessage = `${userName} deleted the task titled "${task.title}"`;
-    await History.create({ taskId, userId, action: "Deleted", message: historyMessage, changes: [] });
+	const historyMessage = `${userName} deleted the task titled "${task.title}"`;
+	await History.create({
+		taskId,
+		userId,
+		action: "Deleted",
+		message: historyMessage,
+		changes: [],
+	});
 
-    if (assignedUser?.email) {
-      await sendTaskEmail(
-        assignedUser.email,
-        "Task Deleted",
-        `The task "${task.title}" assigned to you has been deleted by ${userName}.`,
-        null 
-      );
-    }
+	if (assignedUser?.email) {
+		await sendTaskEmail(
+			assignedUser.email,
+			"Task Deleted",
+			`The task "${task.title}" assigned to you has been deleted by ${userName}.`,
+			null
+		);
+	}
 
-    res.status(200).json({ success: true, message: "Task and associated comments deleted" });
-  } catch (error) {
-    res.status(500).json({ success: false, message: "Error deleting task", error: error.message });
-  }
-};
+	res.status(200).json(new apiResponse(200, null, "Task and associated comments deleted successfully"));
+});

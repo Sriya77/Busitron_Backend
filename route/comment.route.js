@@ -1,7 +1,7 @@
 import express from "express";
 import { addComment, addReply, deleteComment, editComment, getCommentsByTask } from "../controller/comment.controller.js";
-import { upload } from "../middlewares/multer.middleware.js";
 import authenticateUser from "../middlewares/auth.middleware.js";
+import { upload } from "../middlewares/fileupload.middleware.js";
 
 const router = express.Router();
 
@@ -18,8 +18,7 @@ router.post(
 
 router.post(
   "/:commentId/reply",
-  authenticateUser,
-  upload.array("media", 5), 
+  authenticateUser, 
   addReply
 );
 

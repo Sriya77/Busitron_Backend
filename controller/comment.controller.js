@@ -2,380 +2,272 @@ import Comment from "../models/comment.models.js";
 import History from "../models/history.models.js";
 import { User } from "../models/user.models.js";
 import Task from "../models/task.models.js";
-import AWS from "aws-sdk";
 import { extractMentions, sendTaskEmail } from "../helper/sendTaskEmail.js";
-
-const s3 = new AWS.S3({
-	accessKeyId: process.env.AWS_ACCESS_KEY_ID,
-	secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
-	region: process.env.AWS_REGION,
-});
-
-const uploadToS3 = async (file, taskId, type) => {
-	const key = `tasks/${taskId}/comments/${type}/${Date.now()}-${
-		file.originalname
-	}`;
-	const uploadParams = {
-		Bucket: process.env.AWS_S3_BUCKET_COMMENT,
-		Key: key,
-		Body: file.buffer,
-		ContentType: file.mimetype,
-	};
-	const result = await s3.upload(uploadParams).promise();
-	return result.Location;
-};
-
-export const addComment = async (req, res) => {
-	try {
-		const { taskId } = req.params;
-		const { description } = req.body;
-		const userId = req.user._id;
-
-		const task = await Task.findById(taskId);
-		if (!task)
-			return res
-				.status(404)
-				.json({ success: false, message: "Task not found" });
-
-		const user = await User.findById(userId).select("name email");
-		if (!user)
-			return res
-				.status(404)
-				.json({ success: false, message: "User not found" });
-
-		const mediaFiles = req.files || [];
-		const uploadedMedia = await Promise.all(
-			mediaFiles.map((file) => uploadToS3(file, taskId, "media"))
-		);
-
-		const taskAssignee = await User.findById(task.assignedTo).select(
-			"email"
-		);
-		const taskCreator = await User.findById(task.createdBy).select("email");
-
-		const mentionedUsers = await extractMentions(description);
-		const mentionedEmails = mentionedUsers
-			.map((u) => u.email)
-			.filter(Boolean);
-
-		let recipients = [
-			taskAssignee?.email,
-			taskCreator?.email,
-			...mentionedEmails,
-		].filter(Boolean);
-
-		if (recipients.length === 0) {;
-			return res
-				.status(400)
-				.json({
-					success: false,
-					message: "No valid recipients for email notification.",
-				});
-		}
+import { errorHandler } from "../utils/errorHandle.js";
+import { asyncHandler } from "../utils/asyncHandle.js";
+import { apiResponse } from "../utils/apiResponse.js";
+import { uploadToS3 } from "../services/aws.service.js";
 
 
-		let emailSent = false;
+
+export const addComment = asyncHandler(async (req, res) => {
+	const { taskId } = req.params;
+	const { description } = req.body;
+	const userId = req.user._id;
+
+	const [task, user] = await Promise.all([
+		Task.findById(taskId),
+		User.findById(userId).select("name email"),
+	]);
+
+	if (!task) throw new errorHandler(404, "Task not found");
+	if (!user) throw new errorHandler(404, "User not found");
+
+	const mediaFiles = req.files || [];
+	const uploadedMedia = await Promise.all(
+		mediaFiles.map((file) =>
+			uploadToS3(file, `tasks/${taskId}/comments/attachments`)
+		)
+	);
+
+	const [taskAssignee, taskCreator] = await Promise.all([
+		User.findById(task.assignedTo).select("email"),
+		User.findById(task.createdBy).select("email"),
+	]);
+
+	const mentionedUsers = await extractMentions(description);
+	const mentionedEmails = mentionedUsers.map((u) => u.email).filter(Boolean);
+
+	const recipients = new Set(
+		[taskAssignee?.email, taskCreator?.email, ...mentionedEmails].filter(
+			Boolean
+		)
+	);
+
+	if (recipients.size > 0) {
 		try {
-			for (let email of recipients) {
-				await sendTaskEmail(
-					email,
-					"New Comment Added",
-					`${user.name} added a comment`,
-					taskId
-				);
-			}
-			emailSent = true;
+			await Promise.all(
+				[...recipients].map((email) =>
+					sendTaskEmail(
+						email,
+						"New Comment Added",
+						`${user.name} added a comment`,
+						taskId
+					)
+				)
+			);
 		} catch (emailError) {
-			return res
-				.status(500)
-				.json({
-					success: false,
-					message: `Email notification failed. Comment not saved.: ${emailError}`,
-				});
-		}
-
-		if (emailSent) {
-			const newComment = await Comment.create({
-				taskId,
-				userId,
-				description,
-				media: uploadedMedia,
-			});
-
-			await History.create({
-				taskId,
-				userId,
-				action: "Comment Added",
-				message: `${user.name} commented: "${description}"`,
-			});
-
-			return res
-				.status(201)
-				.json({
-					success: true,
-					message: "Comment added successfully",
-					comment: newComment,
-				});
-		}
-	} catch (error) {
-		return res
-			.status(500)
-			.json({
-				success: false,
-				message: "Server Error",
-				error: error.message,
-			});
-	}
-};
-
-export const getCommentsByTask = async (req, res) => {
-	try {
-		const { taskId } = req.params;
-		const task = await Task.findById(taskId);
-		if (!task)
-			return res
-				.status(404)
-				.json({ success: false, message: "Task not found" });
-
-		const comments = await Comment.find({ taskId }).populate(
-			"userId",
-			"name email"
-		);
-		res.status(200).json(comments);
-	} catch (error) {
-		res.status(500).json({
-			success: false,
-			message: "Error fetching comments",
-			error: error.message,
-		});
-	}
-};
-
-export const editComment = async (req, res) => {
-	try {
-		const { commentId } = req.params;
-		const { description } = req.body;
-		const userId = req.user._id;
-
-		const comment = await Comment.findById(commentId);
-		if (!comment) {
-			return res
-				.status(404)
-				.json({ success: false, message: "Comment not found" });
-		}
-
-		if (comment.userId.toString() !== userId) {
-			return res.status(403).json({
-				success: false,
-				message: "Not authorized to edit this comment",
-			});
-		}
-
-		const timeDifference = (new Date() - comment.createdAt) / 60000;
-		if (timeDifference > 10) {
-			return res.status(403).json({
-				success: false,
-				message: "Comment can only be edited within 10 minutes",
-			});
-		}
-
-		let uploadedMedia = [];
-		if (req.files && req.files.length > 0) {
-			uploadedMedia = await Promise.all(
-				req.files.map((file) => uploadToS3(file, commentId, "media"))
+			throw new errorHandler(
+				500,
+				`Email notification failed. Comment not saved: ${emailError}`
 			);
 		}
-
-		const mentionedUsers = await extractMentions(description);
-		const mentionedEmails = mentionedUsers
-			.map((u) => u.email)
-			.filter(Boolean);
-
-		if (mentionedEmails.length > 0) {
-			try {
-				for (let email of mentionedEmails) {
-					await sendTaskEmail(
-						email,
-						"Mentioned you with",
-						`A comment was updated: "${description}"`,
-						comment.taskId
-					);
-				}
-			} catch (emailError) {
-				return res
-					.status(500)
-					.json({
-						success: false,
-						message:
-							`Email notification failed. Comment not updated. : ${emailError}`,
-					});
-			}
-		}
-
-		comment.description = description || comment.description;
-		if (uploadedMedia.length > 0) {
-			comment.media = uploadedMedia;
-		}
-
-		await comment.save();
-
-		await History.create({
-			taskId: comment.taskId,
-			userId,
-			action: "Comment Edited",
-			message: `Comment updated: "${description}"`,
-		});
-
-		return res.status(200).json({
-			success: true,
-			message: "Comment updated successfully",
-			data: comment,
-		});
-	} catch (error) {
-		res.status(500).json({
-			success: false,
-			message: "Error updating comment",
-			error: error.message,
-		});
 	}
-};
 
-export const deleteComment = async (req, res) => {
-	try {
-		const { commentId } = req.params;
-		const userId = req.user._id;
+	const newComment = await Comment.create({
+		taskId,
+		userId,
+		description,
+		media: uploadedMedia,
+	});
 
-		const comment = await Comment.findById(commentId);
-		if (!comment)
-			return res
-				.status(404)
-				.json({ success: false, message: "Comment not found" });
+	await History.create({
+		taskId,
+		userId,
+		action: "Comment Added",
+		message: `${user.name} commented: "${description}"`,
+	});
 
-		if (comment.userId.toString() !== userId) {
-			return res.status(403).json({
-				success: false,
-				message: "Not authorized to delete this comment",
-			});
-		}
+	return res
+		.status(201)
+		.json(new apiResponse(201, newComment, "Comment added successfully"));
+});
 
-		const user = await User.findById(userId).select("name email");
-		if (!user)
-			return res
-				.status(404)
-				.json({ success: false, message: "User not found" });
+export const getCommentsByTask = asyncHandler(async (req, res) => {
+	const { taskId } = req.params;
 
-		const timeDifference = (new Date() - comment.createdAt) / 60000;
-		if (timeDifference > 10) {
-			return res.status(403).json({
-				success: false,
-				message: "Comment can only be deleted within 10 minutes",
-			});
-		}
+	const taskExists = await Task.countDocuments({ _id: taskId });
+	if (!taskExists) throw new errorHandler(404, "Task not found");
 
-		const task = await Task.findById(comment.taskId);
-		if (!task)
-			return res
-				.status(404)
-				.json({ success: false, message: "Task not found" });
+	const comments = await Comment.find({ taskId }).populate(
+		"userId",
+		"name email"
+	);
 
-		await Comment.findByIdAndDelete(commentId);
+	return res
+		.status(200)
+		.json(new apiResponse(200, comments, "Comments fetched successfully"));
+});
 
-		await History.create({
-			taskId: comment.taskId,
-			userId,
-			action: "Comment Deleted",
-			message: `${user.name} deleted a comment: "${comment.description}"`,
-		});
+export const editComment = asyncHandler(async (req, res) => {
+	const { commentId } = req.params;
+	const { description } = req.body;
+	const userId = req.user._id;
 
-		res.status(200).json({ success: true, message: "Comment deleted" });
-	} catch (error) {
-		res.status(500).json({
-			success: false,
-			message: "Error deleting comment",
-			error: error.message,
-		});
+	const comment = await Comment.findById(commentId).select(
+		"userId createdAt taskId media description"
+	);
+	if (!comment) throw new errorHandler(404, "Comment not found");
+
+	if (comment.userId.toString() !== userId)
+		throw new errorHandler(403, "Not authorized to edit this comment");
+
+	if ((Date.now() - comment.createdAt.getTime()) / 60000 > 10) {
+		throw new errorHandler(
+			403,
+			"Comment can only be edited within 10 minutes"
+		);
 	}
-};
 
-export const addReply = async (req, res) => {
+	let uploadedMedia = comment.media;
+	if (req.files?.length > 0) {
+		uploadedMedia = await Promise.all(
+			req.files.map((file) =>
+				uploadToS3(file, `tasks/${commentId}/comments/attachments`)
+			)
+		);
+	}
+	const mentionedUsers = await extractMentions(description);
+	const mentionedEmails = mentionedUsers.map((u) => u.email).filter(Boolean);
+
+	if (mentionedEmails.length > 0) {
+		Promise.all(
+			mentionedEmails.map((email) =>
+				sendTaskEmail(
+					email,
+					"Mentioned you",
+					`A comment was updated: "${description}"`,
+					comment.taskId
+				)
+			)
+		).catch((emailError) =>
+			console.error("Email notification failed:", emailError)
+		);
+	}
+
+	await Comment.updateOne(
+		{ _id: commentId },
+		{
+			description: description || comment.description,
+			media: uploadedMedia,
+		}
+	);
+
+	await History.create({
+		taskId: comment.taskId,
+		userId,
+		action: "Comment Edited",
+		message: `Comment updated: "${description}"`,
+	});
+
+	return res
+		.status(200)
+		.json(
+			new apiResponse(
+				200,
+				{ description, media: uploadedMedia },
+				"Comment updated successfully"
+			)
+		);
+});
+
+export const deleteComment = asyncHandler(async (req, res) => {
+	const { commentId } = req.params;
+	const userId = req.user._id;
+
+	const comment = await Comment.findById(commentId).select(
+		"userId createdAt taskId description"
+	);
+	if (!comment) throw new errorHandler(404, "Comment not found");
+
+	if (comment.userId.toString() !== userId) {
+		throw new errorHandler(403, "Not authorized to delete this comment");
+	}
+
+	if ((Date.now() - comment.createdAt.getTime()) / 60000 > 10) {
+		throw new errorHandler(
+			403,
+			"Comment can only be deleted within 10 minutes"
+		);
+	}
+
+	await Comment.deleteOne({ _id: commentId });
+
+	await History.create({
+		taskId: comment.taskId,
+		userId,
+		action: "Comment Deleted",
+		message: `${req.user.name} deleted a comment: "${comment.description}"`,
+	});
+
+	return res
+		.status(200)
+		.json(new apiResponse(200, null, "Comment deleted successfully"));
+});
+
+export const addReply = asyncHandler(async (req, res) => {
 	try {
 		const { commentId } = req.params;
 		const { description } = req.body;
 		const userId = req.user._id;
+		const userName = req.user.name;
+		const userEmail = req.user.email;
 
 		const comment = await Comment.findById(commentId)
 			.populate("userId", "email")
 			.populate({
 				path: "taskId",
 				populate: { path: "assignedTo", select: "email" },
-			});
+			})
+			.lean();
 
 		if (!comment) {
-			return res
-				.status(404)
-				.json({ success: false, message: "Comment not found" });
+			throw new errorHandler(404, "Comment not found");
 		}
-
-		const user = await User.findById(userId).select("name email");
-		if (!user) {
-			return res
-				.status(404)
-				.json({ success: false, message: "User not found" });
-		}
-
-		const mediaFiles = req.files || [];
-		const uploadedMedia = await Promise.all(
-			mediaFiles.map((file) => uploadToS3(file, commentId, "replies"))
-		);
 
 		const mentionedUsers = await extractMentions(description);
-		const mentionedEmails = mentionedUsers
-			.map((u) => u.email)
-			.filter(Boolean);
-
-		let recipients = new Set(
+		const recipients = new Set(
 			[
-				...mentionedEmails,
+				...mentionedUsers.map((u) => u.email).filter(Boolean),
 				comment.userId?.email,
 				comment.taskId?.assignedTo?.email,
+				userEmail,
 			].filter(Boolean)
 		);
 
-
+		let emailStatus = "Success";
 		if (recipients.size > 0) {
 			try {
-				for (let email of recipients) {
-					await sendTaskEmail(
-						email,
-						"New Reply",
-						`${user.name} replied: "${description}"`,
-						comment.taskId._id
-					);
-				}
+				await Promise.all(
+					[...recipients].map((email) =>
+						sendTaskEmail(
+							email,
+							"New Reply",
+							`${userName} replied: "${description}"`,
+							comment.taskId?._id
+						)
+					)
+				);
 			} catch (emailError) {
-				return res
-					.status(500)
-					.json({
-						success: false,
-						message: "Email notification failed. Reply not posted.",
-					});
+				emailStatus = `Failed: ${emailError.message}`;
 			}
 		}
 
-		const reply = { userId, description, media: uploadedMedia };
-		comment.replies.push(reply);
-		await comment.save();
+		const reply = { userId, description };
+		await Comment.findByIdAndUpdate(commentId, {
+			$push: { replies: reply },
+		});
 
-		return res.status(201).json({
-			success: true,
-			message: "Reply added successfully",
-			data: reply,
-		});
+		return res
+			.status(201)
+			.json(
+				new apiResponse(
+					201,
+					{ reply, emailStatus },
+					"Reply added successfully"
+				)
+			);
 	} catch (error) {
-		res.status(500).json({
-			success: false,
-			message: "Error adding reply",
-			error: error.message,
-		});
+		return res.status(500).json(new errorHandler(500, error.message));
 	}
-};
+});

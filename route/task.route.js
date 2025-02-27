@@ -7,7 +7,7 @@ import {
 	updateTask,
 } from "../controller/task.controller.js";
 import authenticateUser from "../middlewares/auth.middleware.js";
-import { upload } from "../middlewares/multer.middleware.js";
+import { upload } from "../middlewares/fileupload.middleware.js";
 
 const router = express.Router();
 
