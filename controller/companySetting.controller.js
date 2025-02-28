@@ -8,7 +8,7 @@ export const getCompanySettings = asyncHandler(async (req, res) => {
         const companySetting = await companySettingModel.find({});
 
         if (companySetting.length == 0 || !companySetting) {
-            return new errorHandler(404, "company is not found");
+            throw new errorHandler(404, "company is not found");
         }
         res.status(200).json(
             new apiResponse(200, companySetting, "company setting fetched successfully")
@@ -29,7 +29,7 @@ export const updateCompanySettings = asyncHandler(async (req, res) => {
         const updatedCompany = await companySettingModel.findOneAndUpdate(
             { _id: id },
             { companyName, companyEmail, phoneNumber, website },
-            { new: true, runValidators: true }
+            { new: true }
         );
 
         if (!updatedCompany) {
@@ -90,15 +90,16 @@ export const updateBusinessAddress = asyncHandler(async (req, res) => {
         if (country) updateFields["location.$.country"] = country;
         if (pinCode) updateFields["location.$.pinCode"] = pinCode;
 
-        await companySettingModel.findOneAndUpdate(
+        const updatedCompanyInfo = await companySettingModel.findOneAndUpdate(
             { _id: companyId, "location.id": Number(id) },
             { $set: updateFields },
             { new: true }
         );
-
-        const companySetting = await companySettingModel.find({});
+        if (!updatedCompanyInfo) {
+            throw new errorHandler(404, "Company or location not found");
+        }
         res.status(200).json(
-            new apiResponse(200, companySetting, "Business address updated successfully")
+            new apiResponse(200, [updatedCompanyInfo], "Business address updated successfully")
         );
     } catch (err) {
         throw new errorHandler(500, err.message);
@@ -113,15 +114,18 @@ export const deleteBusinessAddress = asyncHandler(async (req, res) => {
         const company = await companySettingModel.findById(companyId);
         if (!company) throw new errorHandler(404, "Company not found");
 
-        const locationIndex = company.location.findIndex((loc) => loc.id === Number(id));
-        if (locationIndex === -1) throw new errorHandler(404, "Business address not found");
+        const updatedCompany = await companySettingModel.findByIdAndUpdate(
+            companyId,
+            { $pull: { location: { id: Number(id) } } },
+            { new: true }
+        );
 
-        company.location.splice(locationIndex, 1);
-        await company.save();
-        const companySetting = await companySettingModel.find({});
+        if (!updatedCompany) {
+            throw new errorHandler(404, "Company not found");
+        }
 
         res.status(200).json(
-            new apiResponse(200, companySetting, "Business address deleted successfully")
+            new apiResponse(200, updatedCompany, "Business address deleted successfully")
         );
     } catch (err) {
         throw new errorHandler(500, err.message);
