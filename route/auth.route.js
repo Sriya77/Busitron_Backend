@@ -31,7 +31,7 @@ router.post("/forgot_password", forgotPassword);
 
 router.post("/logout", authenticateUser, logoutUser);
 
-router.post("/changePassword/:_id", changePassword)
+router.post("/changePassword/:_id", changePassword);
 
 router.get("/profile", authenticateUser, (req, res) => {
     res.status(200).json({
