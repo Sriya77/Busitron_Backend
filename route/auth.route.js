@@ -8,6 +8,7 @@ import {
     registerUser,
     resendOtp,
     logoutUser,
+    changePassword,
 } from "../controller/auth.controller.js";
 import authenticateUser from "../middlewares/auth.middleware.js";
 import { upload } from "../middlewares/upload.middleware.js";
@@ -29,6 +30,8 @@ router.post("/isEmailExist", isEmailExist);
 router.post("/forgot_password", forgotPassword);
 
 router.post("/logout", authenticateUser, logoutUser);
+
+router.post("/changePassword/:_id", changePassword)
 
 router.get("/profile", authenticateUser, (req, res) => {
     res.status(200).json({
