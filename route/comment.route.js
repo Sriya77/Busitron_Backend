@@ -6,8 +6,8 @@ import {
     editComment,
     getCommentsByTask,
 } from "../controller/comment.controller.js";
-import authenticateUser from "../middlewares/auth.middleware.js";
 import { upload } from "../middlewares/fileupload.middleware.js";
+import { authenticateUser } from "../middlewares/auth.middleware.js";
 
 const router = express.Router();
 

@@ -10,8 +10,8 @@ import {
     logoutUser,
     changePassword,
 } from "../controller/auth.controller.js";
-import authenticateUser from "../middlewares/auth.middleware.js";
 import { upload } from "../middlewares/upload.middleware.js";
+import { authenticateUser } from "../middlewares/auth.middleware.js";
 
 const router = express.Router();
 

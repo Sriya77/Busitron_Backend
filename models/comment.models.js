@@ -1,38 +1,38 @@
 import mongoose from "mongoose";
 
 const replySchema = new mongoose.Schema(
-	{
-		userId: {
-			type: mongoose.Schema.Types.ObjectId,
-			ref: "User",
-			required: true,
-		},
-		description: { type: String, default: "" },
-		createdAt: { type: Date, default: Date.now },
-	},
-	{ timestamps: true }
+    {
+        assignedBy: {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: "User",
+            required: true,
+        },
+        description: { type: String, default: "" },
+        createdAt: { type: Date, default: Date.now },
+    },
+    { timestamps: true }
 );
 
 const commentSchema = new mongoose.Schema(
-	{
-		taskId: {
-			type: mongoose.Schema.Types.ObjectId,
-			ref: "Task",
-			required: true,
-		},
-		userId: {
-			type: mongoose.Schema.Types.ObjectId,
-			ref: "User",
-			required: true,
-		},
-		description: { type: String, default: "" },
-		media: [{ type: String }],
+    {
+        taskId: {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: "Task",
+            required: true,
+        },
+        assignedBy: {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: "User",
+            required: true,
+        },
+        description: { type: String, default: "" },
+        media: [{ type: String }],
 
-		replies: [replySchema],
+        replies: [replySchema],
 
-		createdAt: { type: Date, default: Date.now },
-	},
-	{ timestamps: true }
+        createdAt: { type: Date, default: Date.now },
+    },
+    { timestamps: true }
 );
 
 const Comment = mongoose.model("Comment", commentSchema);
