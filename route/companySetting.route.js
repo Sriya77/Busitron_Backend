@@ -19,4 +19,4 @@ router.put("/update_business_address/:companyId/:id", updateBusinessAddress);
 
 router.delete("/delete_business_address/:companyId/:id", deleteBusinessAddress);
 
-export { router as companyRouter };
+export default router;
