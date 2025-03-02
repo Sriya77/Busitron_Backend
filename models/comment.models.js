@@ -1,16 +1,25 @@
 import mongoose from "mongoose";
 
+const userSchema = new mongoose.Schema({
+    _id: mongoose.Schema.Types.ObjectId,
+    name: String,
+    email: String,
+    role: String,
+});
+
 const replySchema = new mongoose.Schema(
     {
-        assignedBy: {
+        userId: {
             type: mongoose.Schema.Types.ObjectId,
             ref: "User",
             required: true,
         },
-        description: { type: String, default: "" },
+        userName: { type: String, required: true },
+        userEmail: { type: String, required: true },
+        commentText: { type: String, required: true },
         createdAt: { type: Date, default: Date.now },
     },
-    { timestamps: true }
+    { _id: false } // Prevent automatic generation of _id for replies
 );
 
 const commentSchema = new mongoose.Schema(
@@ -20,17 +29,9 @@ const commentSchema = new mongoose.Schema(
             ref: "Task",
             required: true,
         },
-        assignedBy: {
-            type: mongoose.Schema.Types.ObjectId,
-            ref: "User",
-            required: true,
-        },
-        description: { type: String, default: "" },
-        media: [{ type: String }],
-
+        commentedBy: userSchema,
+        commentText: { type: String, required: true },
         replies: [replySchema],
-
-        createdAt: { type: Date, default: Date.now },
     },
     { timestamps: true }
 );

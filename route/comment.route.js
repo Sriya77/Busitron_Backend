@@ -1,24 +1,23 @@
 import express from "express";
 import {
-    addComment,
     addReply,
+    createComment,
     deleteComment,
     editComment,
     getCommentsByTask,
 } from "../controller/comment.controller.js";
-import { upload } from "../middlewares/fileupload.middleware.js";
 import { authenticateUser } from "../middlewares/auth.middleware.js";
 
 const router = express.Router();
 
+router.post("/createComment/:taskId", authenticateUser, createComment);
+
 router.get("/:taskId", authenticateUser, getCommentsByTask);
 
-router.post("/:taskId", authenticateUser, upload.array("media", 5), addComment);
-
-router.post("/:commentId/reply", authenticateUser, addReply);
-
-router.put("/:commentId", authenticateUser, upload.array("media", 5), editComment);
+router.put("/:commentId", authenticateUser, editComment);
 
 router.delete("/:commentId", authenticateUser, deleteComment);
+
+router.post("/:commentId/reply", authenticateUser, addReply);
 
 export default router;
