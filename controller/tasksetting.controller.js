@@ -1,6 +1,8 @@
 import Tasksetting from "../models/tasksetting.models.js";
 import transporter from "../services/nodemailer.service.js";
 import { User } from "../models/user.models.js";
+import { errorHandler } from "../utils/errorHandle.js";
+import { apiResponse } from "../utils/apiResponse.js";
 export const createTasksetting = async (req, res) => {
 	try {
 		const { selection_visible } = req.body;
@@ -11,15 +13,19 @@ export const createTasksetting = async (req, res) => {
 
 		const savedTasksetting = await newTasksetting.save();
 
-		res.status(201).json(savedTasksetting);
+		res.status(201).json(new apiResponse(201,savedTasksetting));
 	} catch (error) {
-		res.status(500).json({ message: "Error creating task setting", error });
+		throw new errorHandler(500, error.message);
 	}
 };
 
 export const updateTasksetting = async (req, res) => {
 	try {
 		const { id } = req.params;
+		if (!id) {
+			throw new errorHandler(400, "Task setting ID is required");
+		}
+
 		const { selection_visible } = req.body;
 
 		const updatedTasksetting = await Tasksetting.findByIdAndUpdate(
@@ -29,48 +35,37 @@ export const updateTasksetting = async (req, res) => {
 		);
 
 		if (!updatedTasksetting) {
-			return res.status(404).json({ message: "Task setting not found" });
+			throw new errorHandler(400, "Task setting not found");
 		}
 
-		res.status(200).json(updatedTasksetting);
+		res.status(200).json(new apiResponse(200,updatedTasksetting,"save updates successfully"));
 	} catch (error) {
-		res.status(500).json({ message: "Error updating task setting", error });
+		throw new errorHandler(500, error.message);
 	}
 };
 
-export const getTasksetting = async (req, res) => {
+
+
+export const getTasksetting = async (req, res, next) => {
 	try {
-		const { id } = req.params;
-
-		if (id) {
-			const tasksetting = await Tasksetting.findById(id);
-			if (!tasksetting) {
-				return res
-					.status(404)
-					.json({ message: "Task setting not found" });
-			}
-			return res.status(200).json(tasksetting);
-		} else {
-			const tasksettings = await Tasksetting.find();
-			return res.status(200).json(tasksettings);
-		}
+		const tasksettings = await Tasksetting.find();
+		return res.status(200).json(new apiResponse(200,tasksettings));
 	} catch (error) {
-		res.status(500).json({
-			message: "Error fetching task settings",
-			error,
-		});
+		return next(new errorHandler(500, "Error fetching task settings"));
 	}
 };
 
-let beforeDueDateInterval = null;
-let afterDueDateInterval = null;
+
 
 const sendReminderEmails = async (isBeforeDueDate) => {
+	
+
+	
 	try {
 		const users = await User.find();
 
 		if (!users.length) {
-			console.log("No users found.");
+			
 			return;
 		}
 
@@ -95,7 +90,7 @@ const sendReminderEmails = async (isBeforeDueDate) => {
 
 			transporter
 				.sendMail(mailOptions)
-				.then(() => console.log())
+				
 				.catch((error) => console.error(error));
 		});
 	} catch (error) {
@@ -104,15 +99,13 @@ const sendReminderEmails = async (isBeforeDueDate) => {
 };
 
 export const scheduleRecurringEmails = async (req, res) => {
+
+	let beforeDueDateInterval = null;
+    let afterDueDateInterval = null;
 	try {
 		const { beforeDueDate, afterDueDate, sendTaskReminder } = req.body;
 
-		if (
-			!beforeDueDate ||
-			beforeDueDate <= 0 ||
-			!afterDueDate ||
-			afterDueDate <= 0
-		) {
+		if (!beforeDueDate || beforeDueDate <= 0 || !afterDueDate || afterDueDate <= 0) {
 			return res.status(400).json({
 				success: false,
 				message: "Invalid time interval. Both must be at least 1 day.",
@@ -120,7 +113,8 @@ export const scheduleRecurringEmails = async (req, res) => {
 		}
 
 		if (sendTaskReminder !== "YES") {
-			console.log("");
+			
+
 			return res.status(200).json({
 				success: true,
 				message: "",
@@ -133,7 +127,7 @@ export const scheduleRecurringEmails = async (req, res) => {
 		if (beforeDueDateInterval) clearInterval(beforeDueDateInterval);
 		if (afterDueDateInterval) clearInterval(afterDueDateInterval);
 
-		console.log(``);
+		
 
 		beforeDueDateInterval = setInterval(
 			() => sendReminderEmails(true),
@@ -150,11 +144,7 @@ export const scheduleRecurringEmails = async (req, res) => {
 		});
 	} catch (error) {
 		console.error(error);
-		res.status(500).json({
-			success: false,
-			message: "Failed to schedule reminder emails.",
-			error,
-		});
+		throw new errorHandler(500, "Failed to schedule reminder emails.");
 	}
 };
 
@@ -169,17 +159,13 @@ export const stopRecurringEmails = async (req, res) => {
 			afterDueDateInterval = null;
 		}
 
-		console.log("");
+		
 		res.status(200).json({
 			success: true,
 			message: "Scheduled reminder emails stopped.",
 		});
 	} catch (error) {
 		console.error(error);
-		res.status(500).json({
-			success: false,
-			message: "Failed to stop reminder emails.",
-			error,
-		});
+		throw new errorHandler(500, "Failed to stop reminder emails.");
 	}
 };
