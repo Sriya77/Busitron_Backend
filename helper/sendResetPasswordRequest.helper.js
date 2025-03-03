@@ -2,7 +2,7 @@ import transporter from "../services/nodemailer.service.js";
 
 async function sendResetPasswordRequest(email) {
 	try {
-		const resetURL = `http://localhost:5173/enter-new-password`;
+		const resetURL = `http://localhost:5173/${email}/enter-new-password`;
 		const mailOptions = {
 			from: "pavanponnana1@gmail.com",
 			to: email,

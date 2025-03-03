@@ -15,6 +15,10 @@ const userSchema = new Schema(
             lowercase: true,
             trim: true,
         },
+        address: {
+            type: String,
+            required: false,
+        },
         phoneNumber: {
             type: String,
             required: false,
@@ -31,7 +35,7 @@ const userSchema = new Schema(
         },
         role: {
             type: String,
-            enum: ["Admin", "Employee"],
+            enum: ["SuperAdmin", "Admin", "Employee"],
             required: true,
             default: "Employee",
         },
@@ -56,6 +60,38 @@ const userSchema = new Schema(
             type: Date,
             default: null,
         },
+        designation: {
+            type: String,
+            required: true,
+        },
+        employeeId: {
+            type: String,
+            required: true,
+            unique: true,
+        },
+        message: {
+            type: String,
+            default: "",
+        },
+        gender: {
+            type: String,
+            enum: ["Male", "Female", "Other"],
+            required: false,
+        },
+        isActive: {
+            type: String,
+            enum: ["active", "inActive"],
+            default: "active",
+        },
+        department: {
+            type: String,
+            default: null,
+        },
+        maritalStatus: {
+            type: String,
+            enum: ["Single", "Married", "Divorced", "Widowed"],
+            required: false,
+        },
     },
     { timestamps: true }
 );
@@ -64,14 +100,6 @@ userSchema.pre("save", async function (next) {
     if (!this.isModified("password")) return next();
 
     this.password = await bcryptjs.hash(this.password, 10);
-    next();
-});
-
-userSchema.pre(["findOneAndUpdate", "findByIdAndUpdate"], async function (next) {
-    let update = this.getUpdate();
-    if (update.password) {
-        update.password = await bcryptjs.hash(update.password, 10);
-    }
     next();
 });
 
