@@ -22,10 +22,8 @@ export const createEstimate = asyncHandler(async (req, res, next) => {
 		if (!estimateNumber || !client) {
 			new errorHandler("Estimate Number and Client are required.", 400);
 		}
-		console.log("started");
 
 		const existingEstimate = await Estimate.findOne({ estimateNumber });
-		console.log(existingEstimate);
 
 		if (existingEstimate) {
 			new errorHandler(
