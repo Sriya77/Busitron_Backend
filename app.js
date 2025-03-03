@@ -24,6 +24,7 @@ import taskRouter from "./route/task.route.js";
 import commentRouter from "./route/comment.route.js";
 import appSettingRouter from "./route/appsetting.route.js";
 import historyRouter from "./route/history.route.js";
+import userManagement from "./route/userManagement.route.js"
 
 app.use("/api/v1/auth", authRouter);
 app.use("/api/v1/contact", contactRouter);
@@ -32,5 +33,6 @@ app.use("/api/v1/task", taskRouter);
 app.use("/api/v1/comment", commentRouter);
 app.use("/api/v1/appSetting", appSettingRouter);
 app.use("/api/v1/history", historyRouter);
+app.use("/api/v1/users", userManagement);
 
 export default app;

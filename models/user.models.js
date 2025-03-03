@@ -35,7 +35,7 @@ const userSchema = new Schema(
         },
         role: {
             type: String,
-            enum: ["Admin", "Employee"],
+            enum: ["SuperAdmin", "Admin", "Employee"],
             required: true,
             default: "Employee",
         },
@@ -78,7 +78,15 @@ const userSchema = new Schema(
             enum: ["Male", "Female", "Other"],
             required: false,
         },
-
+        isActive: {
+            type: String,
+            enum: ["active", "inActive"],
+            default: "active",
+        },
+        department: {
+            type: String,
+            default: null,
+        },
         maritalStatus: {
             type: String,
             enum: ["Single", "Married", "Divorced", "Widowed"],
