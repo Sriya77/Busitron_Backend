@@ -29,7 +29,7 @@ import commentRouter from "./route/comment.route.js";
 import appSettingRouter from "./route/appsetting.route.js";
 import historyRouter from "./route/history.route.js";
 import userManagement from "./route/userManagement.route.js";
-import { estimateRouter } from "./route/estimate.routes.js";
+import estimateRouter from "./route/estimate.routes.js";
 
 app.use("/api/v1/auth", authRouter);
 app.use("/api/v1/contact", contactRouter);

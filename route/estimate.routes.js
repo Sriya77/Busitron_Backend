@@ -15,4 +15,4 @@ router.get("/get/:id", getEstimateById);
 router.put("/update/:id", updateEstimate);
 router.delete("/delete/:id", deleteEstimate);
 
-export { router as estimateRouter };
+export  default router;
