@@ -33,7 +33,6 @@ export const createEstimate = asyncHandler(async (req, res, next) => {
 				400
 			);
 		}
-		console.log("ongoing");
 
 		const estimate = new Estimate({
 			estimateNumber,
