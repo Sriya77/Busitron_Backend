@@ -101,14 +101,14 @@ export const createTask = asyncHandler(async (req, res) => {
 
 export const getAllTasks = asyncHandler(async (req, res) => {
     try {
-        const tasks = await Task.find()
+        const tasks = await Task.find({ status: { $nin: ["Close", "Deleted"] } })
             .populate("assignedTo", "name email role")
             .populate("assignedBy", "name email role")
             .exec();
 
-        res.status(200).json(new apiResponse(200, tasks, "Tasks retrieved successfully"));
+        res.status(200).json(new apiResponse(200, tasks, "Tasks fetched successfully."));
     } catch (error) {
-        throw new errorHandler(500, error.message);
+        throw new errorHandler(500, "Something went wrong.");
     }
 });
 
