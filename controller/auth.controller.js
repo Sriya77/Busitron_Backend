@@ -253,19 +253,15 @@ export const logoutUser = asyncHandler(async (req, res) => {
 
 export const changePassword = asyncHandler(async (req, res) => {
     try {
-        const { currentPassword, newPassword, confirmPassword } = req.body;
-        const { _id } = req.params;
+        const { newPassword, confirmPassword } = req.body;
+        const { _id } = req.user._id;
 
-        if (!currentPassword || !newPassword || !confirmPassword)
+        if (!newPassword || !confirmPassword)
             throw new errorHandler(400, "All fields are required");
 
         const user = await User.findById(_id);
 
         if (!user) throw new errorHandler(404, "user not found");
-
-        const checkPassword = user.isPasswordCorrect(currentPassword);
-
-        if (!checkPassword) throw new errorHandler(400, "Invalid password");
 
         if (newPassword !== confirmPassword)
             throw new errorHandler(400, "new Password and confirm password does not matched");
