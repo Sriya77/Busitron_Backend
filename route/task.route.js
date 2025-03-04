@@ -2,6 +2,7 @@ import express from "express";
 import {
     createTask,
     deleteTask,
+    getAllTaskByUser,
     getAllTasks,
     getTaskById,
     updateTask,
@@ -14,6 +15,8 @@ const router = express.Router();
 router.post("/createTask", authenticateUser, upload.array("attachments", 5), createTask);
 
 router.get("/getAllTasks", authenticateUser, getAllTasks);
+
+router.get("/getTaskByUser", authenticateUser, getAllTaskByUser);
 
 router.get("/:taskId", authenticateUser, getTaskById);
 

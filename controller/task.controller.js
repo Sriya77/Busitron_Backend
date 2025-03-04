@@ -27,13 +27,12 @@ export const createTask = asyncHandler(async (req, res) => {
         const [creator, assignedUser, latestTask] = await Promise.all([
             User.findById(assignedBy).select("-password"),
             assignedTo ? User.findById(assignedTo).select("-password") : null,
-            Task.findOne().sort({ createdAt: -1 }).select("taskID"), // Fetch latest task to generate ID
+            Task.findOne().sort({ createdAt: -1 }).select("taskID"),
         ]);
 
         if (!creator) throw new errorHandler(404, "Creator not found");
 
-        // Generate Unique Task ID
-        let newTaskID = "TI-0001"; // Default first task ID
+        let newTaskID = "TI-0001";
         if (latestTask && latestTask.taskID) {
             const lastNumber = parseInt(latestTask.taskID.split("-")[1], 10);
             newTaskID = `TI-${String(lastNumber + 1).padStart(4, "0")}`;
@@ -139,9 +138,26 @@ export const getTaskById = asyncHandler(async (req, res) => {
     }
 });
 
+export const getAllTaskByUser = asyncHandler(async (req, res) => {
+    try {
+        const userId = req.user._id;
+
+        if (userId) throw new errorHandler(400, "Unauthenticated user");
+
+        const tasks = await Task.find({ "assignedTo._id": userId });
+
+        if (!tasks.length) throw new errorHandler(400, "No tasks found for this user");
+
+        res.status(200).json(new apiResponse(200, tasks, "Task details retrieved successfully"));
+    } catch (error) {
+        throw new errorHandler(500, error.message);
+    }
+});
+
 export const updateTask = asyncHandler(async (req, res) => {
     const { taskId } = req.params;
-    const { title, dueDate, assignedTo, description, priority, status } = req.body;
+    const { title, dueDate, taskCategory, label, assignedTo, description, priority, status } =
+        req.body;
     const userId = req.user._id;
 
     let task = await Task.findById(taskId);
@@ -158,7 +174,7 @@ export const updateTask = asyncHandler(async (req, res) => {
         historyMessages = [];
     let emailsToNotify = new Set(previousAssignee?.email ? [previousAssignee.email] : []);
 
-    const updateFields = { title, description, priority, status, dueDate };
+    const updateFields = { title, description, priority, status, dueDate, taskCategory, label };
     Object.entries(updateFields).forEach(([field, newValue]) => {
         if (newValue && newValue !== task[field]) {
             changes.push({ field, oldValue: task[field], newValue });
@@ -202,6 +218,11 @@ export const updateTask = asyncHandler(async (req, res) => {
         task.markModified("attachments");
         historyMessages.push(`${userName} added new attachments.`);
         changes.push({ field: "attachments", newValue: "Added new files" });
+    } else if (req.body?.attachments) {
+        task.attachments = req.body.attachments;
+        task.markModified("attachments");
+        historyMessages.push(`${userName} updated attachments.`);
+        changes.push({ field: "attachments", newValue: "Updated existing files" });
     }
 
     if (changes.length) {
