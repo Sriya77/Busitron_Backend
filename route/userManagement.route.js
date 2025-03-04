@@ -3,12 +3,18 @@ import {
     inactivateUser,
     getAllUser,
     getSpecificUser,
+    getUserTasks,
 } from "../controller/userManagement.controller.js";
+import { authenticateUser } from "../middlewares/auth.middleware.js";
 
 const router = Router();
 
-router.get("/all-users", getAllUser);
-router.get("/select-user/:id", getSpecificUser);
-router.put("/inactive", inactivateUser);
+router.get("/all-users", authenticateUser, getAllUser);
+
+router.get("/select-user/:id", authenticateUser, getSpecificUser);
+
+router.put("/inactive", authenticateUser, inactivateUser);
+
+router.get("/getUserTasks", authenticateUser, getUserTasks);
 
 export default router;

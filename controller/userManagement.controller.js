@@ -1,3 +1,5 @@
+import mongoose from "mongoose";
+import Task from "../models/task.models.js";
 import { User } from "../models/user.models.js";
 import { apiResponse } from "../utils/apiResponse.js";
 import { asyncHandler } from "../utils/asyncHandle.js";
@@ -70,5 +72,34 @@ export const inactivateUser = asyncHandler(async (req, res) => {
         res.status(200).json(new apiResponse(200, updatedResponse, "User deleted successfully."));
     } catch (error) {
         throw new errorHandler(500, "Something went wrong.");
+    }
+});
+
+export const getUserTasks = asyncHandler(async (req, res) => {
+    try {
+        const userId = req.user._id;
+
+        const currentDate = new Date();
+        let Pending = 0,
+            overDue = 0;
+
+        const getTasks = await Task.find({
+            "assignedTo._id": new mongoose.Types.ObjectId(userId),
+        })
+        if (!getTasks && getTasks.length === 0)
+            throw new errorHandler(404, "No user record present");
+
+        for (let i = 0; i < getTasks.length; i++) {
+            if (getTasks[i].status !== "Completed" && getTasks[i].dueDate < currentDate) {
+                getTasks[i].status = "overDue";
+                overDue += 1;
+            } else if (getTasks[i].status === "Pending") Pending += 1;
+        }
+
+        res.status(200).json(
+            new apiResponse(200, { getTasks, Pending, overDue }, "user tasks fetched successfully")
+        );
+    } catch (err) {
+        throw new errorHandler(500, err.message);
     }
 });
