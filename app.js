@@ -25,15 +25,22 @@ import authRouter from "./route/auth.route.js";
 import contactRouter from "./route/contact.route.js";
 import companyRouter from "./route/companySetting.route.js";
 import taskRouter from "./route/task.route.js";
+import tasksettings from "./route/tasksetting.route.js";
 import commentRouter from "./route/comment.route.js";
 import appSettingRouter from "./route/appsetting.route.js";
 import historyRouter from "./route/history.route.js";
 import userManagement from "./route/userManagement.route.js";
+import role_permissions from "./route/role_permissions.route.js";
+import modoulesettingsRoute from "./route/moduleSettings.route.js"
 import estimateRouter from "./route/estimate.routes.js";
+
 
 app.use("/api/v1/auth", authRouter);
 app.use("/api/v1/contact", contactRouter);
 app.use("/api/v1/setting", companyRouter);
+app.use("/api/v1/modulesettings",modoulesettingsRoute);
+app.use("/api/v1/role_permissions",role_permissions);
+app.use("/api/v1/tasksettings",tasksettings);
 app.use("/api/v1/task", taskRouter);
 app.use("/api/v1/comment", commentRouter);
 app.use("/api/v1/appSetting", appSettingRouter);
