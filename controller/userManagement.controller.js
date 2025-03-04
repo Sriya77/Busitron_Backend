@@ -5,7 +5,9 @@ import { errorHandler } from "../utils/errorHandle.js";
 
 export const getAllUser = asyncHandler(async (req, res) => {
     try {
-        const allUsers = await User.find({isActive: "active"}).select("-password -accessToken -refreshToken");
+        const allUsers = await User.find({ isActive: "active" }).select(
+            "-password -accessToken -refreshToken"
+        );
 
         if (!allUsers || allUsers.length === 0) {
             throw new errorHandler(404, "No user record present");
@@ -38,19 +40,30 @@ export const getSpecificUser = asyncHandler(async (req, res) => {
 });
 
 export const inactivateUser = asyncHandler(async (req, res) => {
-    const { id, isActiveUser } = req.body;
+    const { id, isActiveUser, role, designation } = req.body;
+
     if (!id) {
         throw new errorHandler(400, "User id is required.");
     }
     try {
         let updatedResponse;
-        if (isActiveUser === "active") {
+        if (isActiveUser === "active" && !role && !designation) {
             updatedResponse = await User.findByIdAndUpdate(id, {
                 isActive: "inActive",
             }).select("-password -accessToken -refreshToken");
-        } else {
+        }
+
+        if (isActiveUser === "inActive" && !role && !designation) {
             updatedResponse = await User.findByIdAndUpdate(id, {
                 isActive: "active",
+            }).select("-password -accessToken -refreshToken");
+        }
+
+        if (!isActiveUser && role && designation) {
+            updatedResponse = await User.findByIdAndUpdate(id, {
+                isActive: "active",
+                role,
+                designation,
             }).select("-password -accessToken -refreshToken");
         }
 
