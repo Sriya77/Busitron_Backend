@@ -1,4 +1,4 @@
-import AWS from "@aws-sdk/client-s3";
+import AWS from "aws-sdk";
 import dotenv from "dotenv";
 
 dotenv.config();
