@@ -26,6 +26,7 @@ import contactRouter from "./route/contact.route.js";
 import companyRouter from "./route/companySetting.route.js";
 import taskRouter from "./route/task.route.js";
 import commentRouter from "./route/comment.route.js";
+import workLogRoute from "./route/worklog.route.js"
 import appSettingRouter from "./route/appsetting.route.js";
 import historyRouter from "./route/history.route.js";
 import userManagement from "./route/userManagement.route.js";
@@ -36,6 +37,7 @@ app.use("/api/v1/contact", contactRouter);
 app.use("/api/v1/setting", companyRouter);
 app.use("/api/v1/task", taskRouter);
 app.use("/api/v1/comment", commentRouter);
+app.use("/api/v1/workLog", workLogRoute);
 app.use("/api/v1/appSetting", appSettingRouter);
 app.use("/api/v1/history", historyRouter);
 app.use("/api/v1/users", userManagement);
