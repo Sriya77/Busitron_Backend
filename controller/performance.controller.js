@@ -137,6 +137,7 @@ export const getParticularUserTask = asyncHandler(async (req, res) => {
             completedTasks = 0,
             dueTasks = 0,
             totalTasks = 0,
+            todo = 0,
             inprogress = 0;
 
         const getTasks = await Task.find({
@@ -146,7 +147,11 @@ export const getParticularUserTask = asyncHandler(async (req, res) => {
             .lean();
 
         totalTasks = getTasks.length;
-        const currentDate = new Date();
+        const currentDate = new Date().toLocaleDateString("en-GB", {
+            day: "2-digit",
+            month: "2-digit",
+            year: "numeric",
+        });
 
         for (let i = 0; i < getTasks.length; i++) {
             getTasks[i].startDate = getTasks[i].startDate
@@ -169,9 +174,12 @@ export const getParticularUserTask = asyncHandler(async (req, res) => {
                 pendingTasks += 1;
             } else if (getTasks[i].status === "In Progress") {
                 inprogress += 1;
+            } else if (getTasks[i].status === "To Do") {
+                todo += 1;
             } else if (
                 getTasks[i].status !== "Completed" &&
-                getTasks[i].dueDate < currentDate.toISOString().split("T")[0]
+                getTasks[i].status !== "Deleted" &&
+                getTasks[i].dueDate < currentDate
             ) {
                 getTasks[i].status = "overdue";
                 dueTasks += 1;
@@ -180,7 +188,7 @@ export const getParticularUserTask = asyncHandler(async (req, res) => {
         res.status(200).json(
             new apiResponse(
                 200,
-                { totalTasks, completedTasks, pendingTasks, dueTasks, getTasks },
+                { totalTasks, completedTasks, pendingTasks, dueTasks, getTasks, todo },
                 "task fetched successfully"
             )
         );
