@@ -94,37 +94,6 @@ export const getAllTickets = asyncHandler(async (req, res) => {
     }
 });
 
-export const deleteTicketById = asyncHandler(async (req, res) => {
-    try {
-        const { ticketID } = req.params;
-
-        const ticket = await Ticket.findById(ticketID);
-        if (!ticket) throw new errorHandler(404, "Ticket not found");
-
-        await Ticket.findByIdAndDelete(ticket);
-
-        res.status(200).json(new apiResponse(200, null, "Ticket deleted successfully"));
-    } catch (error) {
-        throw new errorHandler(500, error.message);
-    }
-});
-
-export const getTicketsByUser = asyncHandler(async (req, res) => {
-    try {
-        const userId = req.user._id;
-
-        if (!userId) throw new errorHandler(400, "Unauthenticated user");
-
-        const ticket = await Ticket.find({ "userId._id": userId });
-
-        if (!ticket.length) throw new errorHandler(400, "No tasks found for this user");
-
-        res.status(200).json(new apiResponse(200, ticket, "Ticket details retrieved successfully"));
-    } catch (error) {
-        throw new errorHandler(500, error.message);
-    }
-});
-
 export const updateTicketById = asyncHandler(async (req, res, next) => {
     try {
         const { ticketID } = req.params;
@@ -166,5 +135,36 @@ export const updateTicketById = asyncHandler(async (req, res, next) => {
         res.status(200).json(new apiResponse(200, existingTicket, "Ticket updated successfully."));
     } catch (error) {
         next(new errorHandler(500, error.message));
+    }
+});
+
+export const deleteTicketById = asyncHandler(async (req, res) => {
+    try {
+        const { ticketID } = req.params;
+
+        const ticket = await Ticket.findById(ticketID);
+        if (!ticket) throw new errorHandler(404, "Ticket not found");
+
+        await Ticket.findByIdAndDelete(ticket);
+
+        res.status(200).json(new apiResponse(200, null, "Ticket deleted successfully"));
+    } catch (error) {
+        throw new errorHandler(500, error.message);
+    }
+});
+
+export const getTicketsByUser = asyncHandler(async (req, res) => {
+    try {
+        const userId = req.user._id;
+
+        if (!userId) throw new errorHandler(400, "Unauthenticated user");
+
+        const ticket = await Ticket.find({ "userId._id": userId });
+
+        if (!ticket.length) throw new errorHandler(400, "No tasks found for this user");
+
+        res.status(200).json(new apiResponse(200, ticket, "Ticket details retrieved successfully"));
+    } catch (error) {
+        throw new errorHandler(500, error.message);
     }
 });
