@@ -56,8 +56,6 @@ export const createTask = asyncHandler(async (req, res) => {
                 email: creator.email,
                 role: creator.role,
             },
-            status,
-            priority,
             projectId,
             taskCategory,
             startDate,

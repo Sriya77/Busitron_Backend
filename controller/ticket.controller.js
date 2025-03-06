@@ -49,10 +49,8 @@ export const createTicket = asyncHandler(async (req, res) => {
                 role: creator.role,
             },
             assignTeam,
-            status,
             ticketType,
             ticketSubject,
-            priority,
             description,
         });
 
