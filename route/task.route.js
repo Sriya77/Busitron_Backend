@@ -6,6 +6,7 @@ import {
     getAllTasks,
     getTaskById,
     updateTask,
+    gettaskbyPID,
 } from "../controller/task.controller.js";
 import { upload } from "../middlewares/fileupload.middleware.js";
 import { authenticateUser } from "../middlewares/auth.middleware.js";
@@ -23,5 +24,7 @@ router.get("/:taskId", authenticateUser, getTaskById);
 router.put("/:taskId", authenticateUser, upload.array("attachments", 5), updateTask);
 
 router.delete("/:taskId", authenticateUser, deleteTask);
+
+router.get("/gettaskbyid/:id",gettaskbyPID )
 
 export default router;
