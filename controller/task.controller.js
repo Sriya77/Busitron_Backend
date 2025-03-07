@@ -10,32 +10,32 @@ import Task from "../models/task.models.js";
 import mongoose from "mongoose";
 
 export const createTask = asyncHandler(async (req, res) => {
-	try {
-		const {
-			title,
-			taskCategory,
-			projectId,
-			startDate,
-			dueDate,
-			assignedTo,
-			assignedBy,
-			description,
-			label,
-		} = req.body;
+    try {
+        const {
+            title,
+            taskCategory,
+            projectId,
+            startDate,
+            dueDate,
+            assignedTo,
+            assignedBy,
+            description,
+            label,
+        } = req.body;
 
-		const [creator, assignedUser, latestTask] = await Promise.all([
-			User.findById(assignedBy).select("-password"),
-			assignedTo ? User.findById(assignedTo).select("-password") : null,
-			Task.findOne().sort({ createdAt: -1 }).select("taskID"),
-		]);
+        const [creator, assignedUser, latestTask] = await Promise.all([
+            User.findById(assignedBy).select("-password"),
+            assignedTo ? User.findById(assignedTo).select("-password") : null,
+            Task.findOne().sort({ createdAt: -1 }).select("taskID"),
+        ]);
 
-		if (!creator) throw new errorHandler(404, "Creator not found");
+        if (!creator) throw new errorHandler(404, "Creator not found");
 
-		let newTaskID = "TI-0001";
-		if (latestTask && latestTask.taskID) {
-			const lastNumber = parseInt(latestTask.taskID.split("-")[1], 10);
-			newTaskID = `TI-${String(lastNumber + 1).padStart(4, "0")}`;
-		}
+        let newTaskID = "TI-0001";
+        if (latestTask && latestTask.taskID) {
+            const lastNumber = parseInt(latestTask.taskID.split("-")[1], 10);
+            newTaskID = `TI-${String(lastNumber + 1).padStart(4, "0")}`;
+        }
 
         const task = await Task.create({
             taskID: newTaskID, // Assigning the generated Task ID
