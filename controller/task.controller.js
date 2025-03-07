@@ -20,8 +20,6 @@ export const createTask = asyncHandler(async (req, res) => {
             assignedBy,
             description,
             label,
-            priority,
-            status,
         } = req.body;
 
         const [creator, assignedUser, latestTask] = await Promise.all([
