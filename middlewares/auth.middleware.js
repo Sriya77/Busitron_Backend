@@ -1,7 +1,7 @@
-import { User } from "../models/user.models.js";
 import jwt from "jsonwebtoken";
 import { errorHandler } from "../utils/errorHandle.js";
 import { asyncHandler } from "../utils/asyncHandle.js";
+import User from "../models/user.models.js";
 
 export const authenticateUser = asyncHandler(async (req, res, next) => {
     try {
