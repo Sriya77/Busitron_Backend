@@ -19,6 +19,10 @@ const userSchema = new Schema(
             type: String,
             required: false,
         },
+        companyName: {
+            type: String,
+            required: false,
+        },
         phoneNumber: {
             type: String,
             required: false,
@@ -112,6 +116,9 @@ userSchema.methods.generateAccessToken = function () {
         {
             _id: this._id,
             email: this.email,
+            name: this.name,
+            role: this.role,
+            companyName: this.companyName,
         },
         process.env.ACCESS_TOKEN_SECRET,
         {

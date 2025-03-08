@@ -5,420 +5,380 @@ import { errorHandler } from "../utils/errorHandle.js";
 import { uploadToS3 } from "../services/aws.service.js";
 
 export const createProject = asyncHandler(async (req, res) => {
-	try {
-		const {
-			shortCode,
-			projectName,
-			startDate,
-			endDate,
-			projectCategory,
-			department,
-			projectSummary,
-		} = req.body;
+    try {
+        const {
+            shortCode,
+            projectName,
+            startDate,
+            endDate,
+            projectCategory,
+            department,
+            projectSummary,
+        } = req.body;
 
-		if (!projectName || !startDate || !endDate)
-			throw new errorHandler(400, "All required fields must be filled.");
+        const assignedBy = req.user;
 
-		const newProject = new projectModel({
-			shortCode,
-			projectName,
-			startDate,
-			endDate,
-			projectCategory,
-			department,
-			projectSummary,
-		});
-		if (!newProject)
-			throw new errorHandler(400, "project not saved successfully");
-		await newProject.save();
+        if (!projectName || !startDate || !endDate)
+            throw new errorHandler(400, "All required fields must be filled.");
 
-		if (req.files?.length) {
-			newProject.attachments = await Promise.all(
-				req.files.map((file) =>
-					uploadToS3(file, `projects/${newProject._id}/attachments`)
-				)
-			);
+        const newProject = new projectModel({
+            shortCode,
+            projectName,
+            startDate,
+            endDate,
+            projectCategory,
+            department,
+            projectSummary,
+            assignedBy: {
+                _id: assignedBy._id,
+                name: assignedBy.name,
+                email: assignedBy.email,
+                role: assignedBy.role,
+                companyName: assignedBy.companyName,
+            },
+        });
+        if (!newProject) throw new errorHandler(400, "project not saved successfully");
+        await newProject.save();
 
-			await newProject.save();
-		}
+        if (req.files?.length) {
+            newProject.attachments = await Promise.all(
+                req.files.map((file) => uploadToS3(file, `projects/${newProject._id}/attachments`))
+            );
 
-		if (!newProject)
-			throw new errorHandler(400, "project not saved successfully");
+            await newProject.save();
+        }
 
-		res.status(201).json(
-			new apiResponse(201, newProject, "Project created successfully")
-		);
-	} catch (error) {
-		throw errorHandler(500, error.message);
-	}
+        if (!newProject) throw new errorHandler(400, "project not saved successfully");
+
+        res.status(201).json(new apiResponse(201, newProject, "Project created successfully"));
+    } catch (error) {
+        throw new errorHandler(500, error.message);
+    }
 });
 
 export const getAllProjects = asyncHandler(async (req, res) => {
-	try {
-		const projects = await projectModel.find();
-		if (projects.length === 0)
-			throw new errorHandler(404, "project not found");
-		res.status(200).json(
-			new apiResponse(200, projects, "Projects fetched successfully")
-		);
-	} catch (error) {
-		throw errorHandler(500, error.message);
-	}
+    try {
+        const user = req.user;
+
+        const projects = await projectModel.find({ "assignedBy.companyName": user.companyName });
+
+        res.status(200).json(new apiResponse(200, projects, "Projects fetched successfully"));
+    } catch (error) {
+        throw new errorHandler(500, error.message);
+    }
 });
 
 export const getProjectById = asyncHandler(async (req, res) => {
-	try {
-		const { id } = req.params;
-		if (!id) throw new errorHandler(400, "projectId must be required");
-		const project = await projectModel.findById(id).populate({
-			path: "projectMembers",
-			select: "name email phoneNumber avatar role",
-		});
+    try {
+        const { id } = req.params;
+        if (!id) throw new errorHandler(400, "projectId must be required");
+        const project = await projectModel.findById(id).populate({
+            path: "projectMembers",
+            select: "name email phoneNumber avatar role",
+        });
 
-		if (!project) throw new errorHandler(404, "Project not found.");
+        if (!project) throw new errorHandler(404, "Project not found.");
 
-		const attachmentsWithFilenames =
-			project.attachments?.map((link) => {
-				const parts = link.split("/");
-				const filename = parts[parts.length - 1];
-				return { link, filename };
-			}) || [];
+        const attachmentsWithFilenames =
+            project.attachments?.map((link) => {
+                const parts = link.split("/");
+                const filename = parts[parts.length - 1];
+                return { link, filename };
+            }) || [];
 
-		res.status(200).json(
-			new apiResponse(
-				200,
-				{
-					...project.toObject(),
-					attachments: attachmentsWithFilenames,
-				},
-				"Project fetched successfully"
-			)
-		);
-	} catch (error) {
-		throw errorHandler(500, error.message);
-	}
+        res.status(200).json(
+            new apiResponse(
+                200,
+                {
+                    ...project.toObject(),
+                    attachments: attachmentsWithFilenames,
+                },
+                "Project fetched successfully"
+            )
+        );
+    } catch (error) {
+        throw new errorHandler(500, error.message);
+    }
 });
 
 export const updateProject = asyncHandler(async (req, res) => {
-	try {
-		const { id } = req.params;
-		if (!id) throw new errorHandler(400, "projectId must be required");
-		const updatedProject = await projectModel.findByIdAndUpdate(
-			id,
-			{ $set: req.body },
-			{ new: true }
-		);
+    try {
+        const { id } = req.params;
+        if (!id) throw new errorHandler(400, "projectId must be required");
 
-		if (!updatedProject) throw new errorHandler(404, "Project not found.");
-		res.status(200).json(
-			new apiResponse(200, updatedProject, "Project updated successfully")
-		);
-	} catch (error) {
-		throw errorHandler(500, error.message);
-	}
+        const updatedProject = await projectModel.findByIdAndUpdate(
+            id,
+            { $set: req.body },
+            { new: true }
+        );
+
+        if (req.files?.length) {
+            const newAttachments = await Promise.all(
+                req.files.map((file) => uploadToS3(file, `project/${id}/attachments`))
+            );
+            updatedProject.attachments.push(...newAttachments);
+            updatedProject.markModified("attachments");
+        } else if (req.body?.attachments) {
+            updatedProject.attachments = req.body.attachments;
+            updatedProject.markModified("attachments");
+        }
+
+        await updatedProject.save();
+        if (!updatedProject) throw new errorHandler(404, "Project not found.");
+        res.status(200).json(new apiResponse(200, updatedProject, "Project updated successfully"));
+    } catch (error) {
+        throw new errorHandler(500, error.message);
+    }
 });
 
 export const deleteProjectMember = asyncHandler(async (req, res) => {
-	try {
-		const { projectId, memberId } = req.params;
+    try {
+        const { projectId, memberId } = req.params;
 
-		if (!projectId) throw new errorHandler(400, "projectId is required");
+        if (!projectId) throw new errorHandler(400, "projectId is required");
 
-		if (memberId.length === 0) {
-			throw new errorHandler(400, "select atleast one number");
-		}
+        if (memberId.length === 0) {
+            throw new errorHandler(400, "select atleast one number");
+        }
 
-		const project = await projectModel.findById(projectId);
+        const project = await projectModel.findById(projectId);
 
-		if (!project) {
-			throw new errorHandler(404, "Project not found.");
-		}
+        if (!project) {
+            throw new errorHandler(404, "Project not found.");
+        }
 
-		const memberIndex = project.projectMembers.findIndex(
-			(member) => member._id.toString() === memberId
-		);
+        const memberIndex = project.projectMembers.findIndex(
+            (member) => member._id.toString() === memberId
+        );
 
-		if (memberIndex === -1) {
-			throw new errorHandler(404, "Project member not found.");
-		}
+        if (memberIndex === -1) {
+            throw new errorHandler(404, "Project member not found.");
+        }
 
-		project.projectMembers.splice(memberIndex, 1);
+        project.projectMembers.splice(memberIndex, 1);
 
-		await project.save();
+        await project.save();
 
-		res.status(200).json(
-			new apiResponse(200, project, "Project member deleted successfully")
-		);
-	} catch (error) {
-		throw errorHandler(500, error.message);
-	}
+        res.status(200).json(new apiResponse(200, project, "Project member deleted successfully"));
+    } catch (error) {
+        throw new errorHandler(500, error.message);
+    }
 });
 
 export const addProjectMembers = asyncHandler(async (req, res) => {
-	try {
-		const { projectId } = req.params;
-		const members = req.body;
+    try {
+        const { projectId } = req.params;
+        const members = req.body;
 
-		if (!Array.isArray(members) || members.length === 0) {
-			throw new errorHandler(400, "Please Select Atleast One User");
-		}
+        if (!Array.isArray(members) || members.length === 0) {
+            throw new errorHandler(400, "Please Select Atleast One User");
+        }
 
-		const project = await projectModel.findById(projectId);
-		if (!project) throw new errorHandler(404, "Project not found.");
+        const project = await projectModel.findById(projectId);
+        if (!project) throw new errorHandler(404, "Project not found.");
 
-		const newMemberIds = members.map((member) => member.id);
-		const existingMembers = new Set(
-			project.projectMembers.map((id) => id.toString())
-		);
+        const newMemberIds = members.map((member) => member.id);
+        const existingMembers = new Set(project.projectMembers.map((id) => id.toString()));
 
-		const membersToAdd = newMemberIds.filter(
-			(id) => !existingMembers.has(id)
-		);
+        const membersToAdd = newMemberIds.filter((id) => !existingMembers.has(id));
 
-		if (membersToAdd.length === 0) {
-			throw new errorHandler(
-				400,
-				"All selected members are already in the project."
-			);
-		}
-		project.projectMembers.push(...membersToAdd);
-		await project.save();
-		const updatedProject = await projectModel
-			.findById(projectId)
-			.populate("projectMembers", "name email phoneNumber avatar role");
-		res.status(200).json(
-			new apiResponse(
-				200,
-				updatedProject,
-				"Project members added successfully."
-			)
-		);
-	} catch (error) {
-		throw errorHandler(500, error.message);
-	}
+        if (membersToAdd.length === 0) {
+            throw new errorHandler(400, "All selected members are already in the project.");
+        }
+        project.projectMembers.push(...membersToAdd);
+        await project.save();
+        const updatedProject = await projectModel
+            .findById(projectId)
+            .populate("projectMembers", "name email phoneNumber avatar role");
+        res.status(200).json(
+            new apiResponse(200, updatedProject, "Project members added successfully.")
+        );
+    } catch (error) {
+        throw new errorHandler(500, error.message);
+    }
 });
 
 export const addMilestone = asyncHandler(async (req, res) => {
-	try {
-		const { projectId } = req.params;
-		const { title, startDate, endDate, status } = req.body;
+    try {
+        const { projectId } = req.params;
+        const { title, startDate, endDate, status } = req.body;
 
-		const project = await projectModel.findById(projectId);
-		if (!project) throw new errorHandler(404, "Project not found.");
+        const project = await projectModel.findById(projectId);
+        if (!project) throw new errorHandler(404, "Project not found.");
 
-		const newMilestone = { title, startDate, endDate, status };
-		project.mileStone.push(newMilestone);
+        const newMilestone = { title, startDate, endDate, status };
+        project.mileStone.push(newMilestone);
 
-		await project.save();
+        await project.save();
 
-		res.status(201).json(
-			new apiResponse(201, project, "Milestone added successfully.")
-		);
-	} catch (error) {
-		throw errorHandler(500, error.message);
-	}
+        res.status(201).json(new apiResponse(201, project, "Milestone added successfully."));
+    } catch (error) {
+        throw new errorHandler(500, error.message);
+    }
 });
 
 export const updateMilestone = asyncHandler(async (req, res) => {
-	try {
-		const { projectId, milestoneId } = req.params;
-		const updatedData = req.body;
+    try {
+        const { projectId, milestoneId } = req.params;
+        const updatedData = req.body;
 
-		const project = await projectModel.findById(projectId);
-		if (!project) throw new errorHandler(404, "Project not found.");
+        const project = await projectModel.findById(projectId);
+        if (!project) throw new errorHandler(404, "Project not found.");
 
-		const milestone = project.mileStone.id(milestoneId);
-		if (!milestone) throw new errorHandler(404, "Milestone not found.");
+        const milestone = project.mileStone.id(milestoneId);
+        if (!milestone) throw new errorHandler(404, "Milestone not found.");
 
-		Object.assign(milestone, updatedData);
-		await project.save();
+        Object.assign(milestone, updatedData);
+        await project.save();
 
-		res.status(200).json(
-			new apiResponse(200, milestone, "Milestone updated successfully.")
-		);
-	} catch (error) {
-		throw errorHandler(500, error.message);
-	}
+        res.status(200).json(new apiResponse(200, milestone, "Milestone updated successfully."));
+    } catch (error) {
+        throw new errorHandler(500, error.message);
+    }
 });
 
 export const deleteMilestone = asyncHandler(async (req, res) => {
-	try {
-		const { projectId, milestoneId } = req.params;
+    try {
+        const { projectId, milestoneId } = req.params;
 
-		const project = await projectModel.findById(projectId);
-		if (!project) throw new errorHandler(404, "Project not found.");
+        const project = await projectModel.findById(projectId);
+        if (!project) throw new errorHandler(404, "Project not found.");
 
-		if (!project.mileStone || project.mileStone.length === 0) {
-			throw new errorHandler(404, "No milestones found in this project.");
-		}
+        if (!project.mileStone || project.mileStone.length === 0) {
+            throw new errorHandler(404, "No milestones found in this project.");
+        }
 
-		const updatedMilestones = project.mileStone.filter(
-			(milestone) => milestone._id.toString() !== milestoneId
-		);
+        const updatedMilestones = project.mileStone.filter(
+            (milestone) => milestone._id.toString() !== milestoneId
+        );
 
-		project.mileStone = updatedMilestones;
-		await project.save();
+        project.mileStone = updatedMilestones;
+        await project.save();
 
-		res.status(200).json(
-			new apiResponse(200, project, "Milestone deleted successfully.")
-		);
-	} catch (error) {
-		throw errorHandler(500, error.message);
-	}
+        res.status(200).json(new apiResponse(200, project, "Milestone deleted successfully."));
+    } catch (error) {
+        throw new errorHandler(500, error.message);
+    }
 });
 
 export const getMilestones = asyncHandler(async (req, res) => {
-	try {
-		const { projectId } = req.params;
+    try {
+        const { projectId } = req.params;
 
-		if (!projectId)
-			throw new errorHandler(400, "projectId must be required");
+        if (!projectId) throw new errorHandler(400, "projectId must be required");
 
-		const project = await projectModel.findById(projectId);
-		if (!project) throw new errorHandler(404, "Project not found.");
+        const project = await projectModel.findById(projectId);
+        if (!project) throw new errorHandler(404, "Project not found.");
 
-		res.status(200).json(
-			new apiResponse(
-				200,
-				project.mileStone,
-				"Milestones fetched successfully."
-			)
-		);
-	} catch (error) {
-		throw errorHandler(500, error.message);
-	}
+        res.status(200).json(
+            new apiResponse(200, project.mileStone, "Milestones fetched successfully.")
+        );
+    } catch (error) {
+        throw new errorHandler(500, error.message);
+    }
 });
 
 export const deleteProject = asyncHandler(async (req, res) => {
-	try {
-		const { id } = req.params;
-		if (!id) throw new errorHandler(400, "projectId must be required");
-		const deletedProject = await projectModel.findByIdAndDelete(id, {
-			new: true,
-		});
+    try {
+        const { id } = req.params;
+        if (!id) throw new errorHandler(400, "projectId must be required");
+        const deletedProject = await projectModel.findByIdAndDelete(id, {
+            new: true,
+        });
 
-		if (!deletedProject) throw new errorHandler(404, "Project not found.");
-		res.status(200).json(
-			new apiResponse(200, deletedProject, "Project deleted successfully")
-		);
-	} catch (error) {
-		throw errorHandler(500, error.message);
-	}
+        if (!deletedProject) throw new errorHandler(404, "Project not found.");
+        res.status(200).json(new apiResponse(200, deletedProject, "Project deleted successfully"));
+    } catch (error) {
+        throw new errorHandler(500, error.message);
+    }
 });
 
 export const projectfiles = asyncHandler(async (req, res) => {
-	try {
-		const { projectId } = req.params;
-		if (!projectId)
-			throw new errorHandler(400, "projectId must be required");
+    try {
+        const { projectId } = req.params;
+        if (!projectId) throw new errorHandler(400, "projectId must be required");
 
-		const Is_Project = await projectModel.findById(projectId);
-		if (!Is_Project) {
-			throw new errorHandler(400, "Project not found");
-		}
+        const isProject = await projectModel.findById(projectId);
+        if (!isProject) {
+            throw new errorHandler(400, "Project not found");
+        }
 
-		if (req.files?.length) {
-			const uploadedFiles = await Promise.all(
-				req.files.map((file) =>
-					uploadToS3(file, `projects/${Is_Project._id}/attachments`)
-				)
-			);
+        if (req.files?.length) {
+            const uploadedFiles = await Promise.all(
+                req.files.map((file) => uploadToS3(file, `projects/${isProject._id}/attachments`))
+            );
 
-			Is_Project.attachments = [
-				...Is_Project.attachments,
-				...uploadedFiles,
-			];
+            isProject.attachments = [...isProject.attachments, ...uploadedFiles];
 
-			await Is_Project.save();
-		}
+            await isProject.save();
+        }
 
-		return res
-			.status(200)
-			.json(new apiResponse(200, Is_Project.attachments, ""));
-	} catch (error) {
-		throw errorHandler(500, error.message);
-	}
+        return res.status(200).json(new apiResponse(200, isProject.attachments, ""));
+    } catch (error) {
+        throw new errorHandler(500, error.message);
+    }
 });
 
 export const updateProjectFiles = asyncHandler(async (req, res) => {
-	try {
-		const { projectId } = req.params;
-		if (!projectId)
-			throw new errorHandler(400, "projectId must be required");
+    try {
+        const { projectId } = req.params;
+        if (!projectId) throw new errorHandler(400, "projectId must be required");
 
-		const project = await projectModel.findById(projectId);
-		if (!project) {
-			throw new errorHandler(400, "Project not found");
-		}
+        const project = await projectModel.findById(projectId);
+        if (!project) {
+            throw new errorHandler(400, "Project not found");
+        }
 
-		if (req.files?.length) {
-			const uploadedFiles = await Promise.all(
-				req.files.map((file) =>
-					uploadToS3(file, `projects/${project._id}/attachments`)
-				)
-			);
+        if (req.files?.length) {
+            const uploadedFiles = await Promise.all(
+                req.files.map((file) => uploadToS3(file, `projects/${project._id}/attachments`))
+            );
 
-			await projectModel.findByIdAndUpdate(projectId, {
-				$set: { attachments: uploadedFiles },
-			});
-		}
+            await projectModel.findByIdAndUpdate(projectId, {
+                $set: { attachments: uploadedFiles },
+            });
+        }
 
-		return res
-			.status(200)
-			.json(new apiResponse(200, project.attachments, ""));
-	} catch (error) {
-		throw errorHandler(500, error.message);
-	}
+        return res.status(200).json(new apiResponse(200, project.attachments, ""));
+    } catch (error) {
+        throw new errorHandler(500, error.message);
+    }
 });
 
 export const deleteProjectFileURL = asyncHandler(async (req, res) => {
-	try {
-		const { projectId, fileName } = req.params;
-		if (!projectId)
-			throw new errorHandler(400, "projectId must be required");
+    try {
+        const { projectId, fileName } = req.params;
+        if (!projectId) throw new errorHandler(400, "projectId must be required");
 
-		const project = await projectModel.findById(projectId);
-		if (!project) {
-			throw new errorHandler(400, "Project not found");
-		}
+        const project = await projectModel.findById(projectId);
+        if (!project) {
+            throw new errorHandler(400, "Project not found");
+        }
 
-		project.attachments = project.attachments.filter(
-			(file) => !file.includes(fileName)
-		);
+        project.attachments = project.attachments.filter((file) => !file.includes(fileName));
 
-		await project.save();
+        await project.save();
 
-		// add custom response
-		return res
-			.status(200)
-			.json(new apiResponse(200, project.attachments, ""));
-	} catch (error) {
-		throw errorHandler(500, error.message);
-	}
+        // add custom response
+        return res.status(200).json(new apiResponse(200, project.attachments, ""));
+    } catch (error) {
+        throw new errorHandler(500, error.message);
+    }
 });
 
 export const getAllmembers = asyncHandler(async (req, res) => {
-	try {
-		const { projectId } = req.params;
-		if (!projectId)
-			throw new errorHandler(400, "projectId must be required");
-		const Memberdata = await projectModel
-			.findById(projectId)
-			.populate("projectMembers");
-		if (!Memberdata) {
-			throw new errorHandler(400, "project not found");
-		}
-		const ProjectMemberdata = Memberdata.projectMembers;
-		return res
-			.status(200)
-			.json(
-				new apiResponse(
-					200,
-					ProjectMemberdata,
-					"All members fetched successfully"
-				)
-			);
-	} catch (error) {
-		throw errorHandler(500, error.message);
-	}
+    try {
+        const { projectId } = req.params;
+        if (!projectId) throw new errorHandler(400, "projectId must be required");
+        const Memberdata = await projectModel.findById(projectId).populate("projectMembers");
+        if (!Memberdata) {
+            throw new errorHandler(400, "project not found");
+        }
+        const ProjectMemberdata = Memberdata.projectMembers;
+        return res
+            .status(200)
+            .json(new apiResponse(200, ProjectMemberdata, "All members fetched successfully"));
+    } catch (error) {
+        throw new errorHandler(500, error.message);
+    }
 });

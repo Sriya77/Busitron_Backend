@@ -25,6 +25,6 @@ router.put("/:taskId", authenticateUser, upload.array("attachments", 5), updateT
 
 router.delete("/:taskId", authenticateUser, deleteTask);
 
-router.get("/gettaskbyid/:id",gettaskbyPID )
+router.get("/gettaskbyid/:id", authenticateUser, gettaskbyPID);
 
 export default router;

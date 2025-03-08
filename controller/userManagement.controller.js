@@ -5,19 +5,30 @@ import { apiResponse } from "../utils/apiResponse.js";
 import { asyncHandler } from "../utils/asyncHandle.js";
 import { errorHandler } from "../utils/errorHandle.js";
 
-export const getAllUser = asyncHandler(async (req, res) => {
-    try {
-        const allUsers = await User.find({ isActive: "active" }).select(
-            "-password -accessToken -refreshToken"
-        );
+export const getAllUser = asyncHandler(async (req, res, next) => {
+    const { _id } = req.user;
+    const checkRole = await User.findById(_id).select("-password -accessToken -refreshToken");
 
-        if (!allUsers || allUsers.length === 0) {
-            throw new errorHandler(404, "No user record present");
-        }
-        res.status(200).json(new apiResponse(200, allUsers, "User record fetched successfully."));
-    } catch (error) {
-        throw new errorHandler(500, "Something went wrong.");
+    if (!checkRole) {
+        return next(new errorHandler(404, "User not found"));
     }
+
+    let allUsers = [];
+
+    if (checkRole.role === "SuperAdmin") {
+        allUsers = await User.find({
+            isActive: "active",
+            role: "Admin",
+        }).select("-password -accessToken -refreshToken");
+    } else if (checkRole.role === "Admin" || checkRole.role === "Employee") {
+        allUsers = await User.find({
+            isActive: "active",
+            role: "Employee",
+            companyName: checkRole.companyName,
+        }).select("-password -accessToken -refreshToken");
+    }
+
+    res.status(200).json(new apiResponse(200, allUsers, "User record fetched successfully."));
 });
 
 export const getSpecificUser = asyncHandler(async (req, res) => {
@@ -85,7 +96,7 @@ export const getUserTasks = asyncHandler(async (req, res) => {
 
         const getTasks = await Task.find({
             "assignedTo._id": new mongoose.Types.ObjectId(userId),
-        })
+        });
         if (!getTasks && getTasks.length === 0)
             throw new errorHandler(404, "No user record present");
 
