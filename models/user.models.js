@@ -96,6 +96,14 @@ const userSchema = new Schema(
             enum: ["Single", "Married", "Divorced", "Widowed"],
             required: false,
         },
+        status: {
+            type: String,
+            enum: ["Online", "Offline"],
+            default: "Offline",
+          },
+          socketId: {
+            type: String,
+          }
     },
     { timestamps: true }
 );
@@ -138,4 +146,5 @@ userSchema.methods.generateRefreshToken = function () {
     );
 };
 
-export const User = mongoose.model("User", userSchema);
+const User = mongoose.model("User", userSchema);
+export default User;

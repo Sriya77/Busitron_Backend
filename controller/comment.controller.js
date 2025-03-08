@@ -1,6 +1,6 @@
 import Comment from "../models/comment.models.js";
 import History from "../models/history.models.js";
-import { User } from "../models/user.models.js";
+import User from "../models/user.models.js";
 import Task from "../models/task.models.js";
 import { extractMentions, sendTaskEmail } from "../helper/sendTaskEmail.js";
 import { errorHandler } from "../utils/errorHandle.js";
