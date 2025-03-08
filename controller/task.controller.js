@@ -7,6 +7,7 @@ import { apiResponse } from "../utils/apiResponse.js";
 import { asyncHandler } from "../utils/asyncHandle.js";
 import { uploadToS3 } from "../services/aws.service.js";
 import Task from "../models/task.models.js";
+import mongoose from "mongoose";
 
 export const createTask = asyncHandler(async (req, res) => {
     try {
@@ -20,27 +21,24 @@ export const createTask = asyncHandler(async (req, res) => {
             assignedBy,
             description,
             label,
-            priority,
-            status,
         } = req.body;
 
         const [creator, assignedUser, latestTask] = await Promise.all([
             User.findById(assignedBy).select("-password"),
             assignedTo ? User.findById(assignedTo).select("-password") : null,
-            Task.findOne().sort({ createdAt: -1 }).select("taskID"), // Fetch latest task to generate ID
+            Task.findOne().sort({ createdAt: -1 }).select("taskID"),
         ]);
 
         if (!creator) throw new errorHandler(404, "Creator not found");
 
-        // Generate Unique Task ID
-        let newTaskID = "TI-0001"; // Default first task ID
+        let newTaskID = "TI-0001";
         if (latestTask && latestTask.taskID) {
             const lastNumber = parseInt(latestTask.taskID.split("-")[1], 10);
             newTaskID = `TI-${String(lastNumber + 1).padStart(4, "0")}`;
         }
 
         const task = await Task.create({
-            taskID: newTaskID, // Assigning the generated Task ID
+            taskID: newTaskID,
             title,
             description,
             assignedTo: assignedUser
@@ -57,13 +55,13 @@ export const createTask = asyncHandler(async (req, res) => {
                 email: creator.email,
                 role: creator.role,
             },
-            status,
-            priority,
             projectId,
             taskCategory,
             startDate,
             dueDate,
             label,
+            status: req.body.status || "To Do",
+            priority: req.body.priority || "Medium",
         });
 
         if (req.files?.length) {
@@ -102,14 +100,16 @@ export const createTask = asyncHandler(async (req, res) => {
 
 export const getAllTasks = asyncHandler(async (req, res) => {
     try {
-        const tasks = await Task.find()
+        const tasks = await Task.find({
+            status: { $nin: ["Close", "Deleted"] },
+        })
             .populate("assignedTo", "name email role")
             .populate("assignedBy", "name email role")
             .exec();
 
-        res.status(200).json(new apiResponse(200, tasks, "Tasks retrieved successfully"));
+        res.status(200).json(new apiResponse(200, tasks, "Tasks fetched successfully."));
     } catch (error) {
-        throw new errorHandler(500, error.message);
+        throw new errorHandler(500, "Something went wrong.");
     }
 });
 
@@ -139,9 +139,26 @@ export const getTaskById = asyncHandler(async (req, res) => {
     }
 });
 
+export const getAllTaskByUser = asyncHandler(async (req, res) => {
+    try {
+        const userId = req.user._id;
+
+        if (userId) throw new errorHandler(400, "Unauthenticated user");
+
+        const tasks = await Task.find({ "assignedTo._id": userId });
+
+        if (!tasks.length) throw new errorHandler(400, "No tasks found for this user");
+
+        res.status(200).json(new apiResponse(200, tasks, "Task details retrieved successfully"));
+    } catch (error) {
+        throw new errorHandler(500, error.message);
+    }
+});
+
 export const updateTask = asyncHandler(async (req, res) => {
     const { taskId } = req.params;
-    const { title, dueDate, assignedTo, description, priority, status } = req.body;
+    const { title, dueDate, taskCategory, label, assignedTo, description, priority, status } =
+        req.body;
     const userId = req.user._id;
 
     let task = await Task.findById(taskId);
@@ -158,7 +175,15 @@ export const updateTask = asyncHandler(async (req, res) => {
         historyMessages = [];
     let emailsToNotify = new Set(previousAssignee?.email ? [previousAssignee.email] : []);
 
-    const updateFields = { title, description, priority, status, dueDate };
+    const updateFields = {
+        title,
+        description,
+        priority,
+        status,
+        dueDate,
+        taskCategory,
+        label,
+    };
     Object.entries(updateFields).forEach(([field, newValue]) => {
         if (newValue && newValue !== task[field]) {
             changes.push({ field, oldValue: task[field], newValue });
@@ -202,6 +227,14 @@ export const updateTask = asyncHandler(async (req, res) => {
         task.markModified("attachments");
         historyMessages.push(`${userName} added new attachments.`);
         changes.push({ field: "attachments", newValue: "Added new files" });
+    } else if (req.body?.attachments) {
+        task.attachments = req.body.attachments;
+        task.markModified("attachments");
+        historyMessages.push(`${userName} updated attachments.`);
+        changes.push({
+            field: "attachments",
+            newValue: "Updated existing files",
+        });
     }
 
     if (changes.length) {
@@ -266,4 +299,21 @@ export const deleteTask = asyncHandler(async (req, res) => {
     }
 
     res.status(200).json(new apiResponse(200, null, "Task status updated to Deleted successfully"));
+});
+
+export const gettaskbyPID = asyncHandler(async (req, res) => {
+    try {
+        const { id } = req.params;
+
+        if (!mongoose.Types.ObjectId.isValid(id)) {
+            return res.status(400).json(new apiResponse(400, null, "Invalid Project ID"));
+        }
+
+        const projectId = new mongoose.Types.ObjectId(id);
+        const tasks = await Task.find({ projectId });
+        const completedCount = tasks.filter((task) => task.status === "Completed").length;
+        return res.status(200).json(new apiResponse(200, { tasks, completedCount }, null));
+    } catch (error) {
+        return res.status(500).json(new errorHandler(500, "Internal server error"));
+    }
 });

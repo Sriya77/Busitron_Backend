@@ -19,6 +19,10 @@ const userSchema = new Schema(
             type: String,
             required: false,
         },
+        companyName: {
+            type: String,
+            required: false,
+        },
         phoneNumber: {
             type: String,
             required: false,
@@ -35,7 +39,7 @@ const userSchema = new Schema(
         },
         role: {
             type: String,
-            enum: ["Admin", "Employee"],
+            enum: ["SuperAdmin", "Admin", "Employee"],
             required: true,
             default: "Employee",
         },
@@ -78,7 +82,15 @@ const userSchema = new Schema(
             enum: ["Male", "Female", "Other"],
             required: false,
         },
-
+        isActive: {
+            type: String,
+            enum: ["active", "inActive"],
+            default: "active",
+        },
+        department: {
+            type: String,
+            default: null,
+        },
         maritalStatus: {
             type: String,
             enum: ["Single", "Married", "Divorced", "Widowed"],
@@ -112,6 +124,9 @@ userSchema.methods.generateAccessToken = function () {
         {
             _id: this._id,
             email: this.email,
+            name: this.name,
+            role: this.role,
+            companyName: this.companyName,
         },
         process.env.ACCESS_TOKEN_SECRET,
         {
