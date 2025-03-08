@@ -37,6 +37,7 @@ import estimateRouter from "./route/estimate.routes.js";
 import performanceRouter from "./route/performance.route.js";
 import ticketRouter from "./route/ticket.route.js";
 import projectRoutes from "./route/project.route.js";
+import userdashboard from "./route/userdashboard.route.js";
 
 app.use("/api/v1/auth", authRouter);
 app.use("/api/v1/contact", contactRouter);
@@ -54,5 +55,6 @@ app.use("/api/v1/estimates", estimateRouter);
 app.use("/api/v1/performanceTracking", performanceRouter);
 app.use("/api/v1/ticket", ticketRouter);
 app.use("/api/v1/project", projectRoutes);
+app.use("/api/v1/userdashboard",userdashboard);
 
 export default app;
