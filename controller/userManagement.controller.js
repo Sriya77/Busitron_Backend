@@ -1,6 +1,6 @@
 import mongoose from "mongoose";
 import Task from "../models/task.models.js";
-import { User } from "../models/user.models.js";
+import User from "../models/user.models.js";
 import { apiResponse } from "../utils/apiResponse.js";
 import { asyncHandler } from "../utils/asyncHandle.js";
 import { errorHandler } from "../utils/errorHandle.js";

@@ -1,6 +1,7 @@
+import mongoose from "mongoose";
 import { sendTaskEmail } from "../helper/sendTaskEmail.js";
 import { Ticket } from "../models/ticket.models.js";
-import { User } from "../models/user.models.js";
+import User from "../models/user.models.js";
 import { uploadToS3 } from "../services/aws.service.js";
 import { apiResponse } from "../utils/apiResponse.js";
 import { asyncHandler } from "../utils/asyncHandle.js";
@@ -40,6 +41,7 @@ export const createTicket = asyncHandler(async (req, res) => {
                       name: assignedUser.name,
                       email: assignedUser.email,
                       role: assignedUser.role,
+                      companyName: assignedUser.companyName,
                   }
                 : null,
             assignedBy: {
@@ -47,6 +49,7 @@ export const createTicket = asyncHandler(async (req, res) => {
                 name: creator.name,
                 email: creator.email,
                 role: creator.role,
+                companyName: creator.companyName,
             },
             assignTeam,
             ticketType,
@@ -63,7 +66,6 @@ export const createTicket = asyncHandler(async (req, res) => {
 
         const superAdmins = await User.find({ role: "SuperAdmin" }).select("email");
         const adminEmails = superAdmins.map((admin) => admin.email);
-        console.log("SuperAdmin Emails:", adminEmails);
 
         if (adminEmails.length > 0) {
             await sendTaskEmail(
@@ -81,10 +83,24 @@ export const createTicket = asyncHandler(async (req, res) => {
 
 export const getAllTickets = asyncHandler(async (req, res) => {
     try {
-        const ticket = await Ticket.find({ status: { $nin: ["Close"] } })
-            .populate("userId", "name email role")
-            .populate("assignedBy", "name email role")
-            .exec();
+        const { _id } = req.user;
+        const checkRole = await User.findById(_id).select("-password -accessToken -refreshToken");
+
+        let ticket;
+        if (checkRole.role === "Admin") {
+            ticket = await Ticket.find({
+                status: { $nin: ["Close"] },
+                "userId.companyName": checkRole.companyName,
+            }).exec();
+        } else if (checkRole.role === "Employee") {
+            ticket = await Ticket.find({
+                status: { $nin: ["Close"] },
+                "userId._id": new mongoose.Types.ObjectId(_id),
+            })
+                // .populate("assignedTo", "name email role")
+                // .populate("assignedBy", "name email role")
+                .exec();
+        }
 
         res.status(200).json(new apiResponse(200, ticket, "Ticket fetched successfully."));
     } catch (error) {
@@ -146,22 +162,6 @@ export const deleteTicketById = asyncHandler(async (req, res) => {
         await Ticket.findByIdAndDelete(ticket);
 
         res.status(200).json(new apiResponse(200, null, "Ticket deleted successfully"));
-    } catch (error) {
-        throw new errorHandler(500, error.message);
-    }
-});
-
-export const getTicketsByUser = asyncHandler(async (req, res) => {
-    try {
-        const userId = req.user._id;
-
-        if (!userId) throw new errorHandler(400, "Unauthenticated user");
-
-        const ticket = await Ticket.find({ "userId._id": userId });
-
-        if (!ticket.length) throw new errorHandler(400, "No tasks found for this user");
-
-        res.status(200).json(new apiResponse(200, ticket, "Ticket details retrieved successfully"));
     } catch (error) {
         throw new errorHandler(500, error.message);
     }
