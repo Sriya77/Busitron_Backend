@@ -5,7 +5,7 @@ import User from "../models/user.models.js";
 import Task from "../models/task.models.js";
 import mongoose from "mongoose";
 
-export const getCombinedStatistics = asyncHandler(async (req, res, next) => {
+export const getCombinedStatistics = asyncHandler(async (req, res) => {
     try {
         const taskStatistics = {
             totalTasks: 0,
@@ -16,8 +16,31 @@ export const getCombinedStatistics = asyncHandler(async (req, res, next) => {
             overdue: 0,
         };
 
+        const usersData = await User.find(
+            {
+                companyName: req?.user?.companyName,
+                isActive: "active",
+                role: "Employee",
+            },
+            "_id"
+        );
+
+        if (!usersData.length) {
+            return res.status(404).json({
+                success: false,
+                message: "No active users found for this company",
+            });
+        }
+
+        const usersId = usersData.map((user) => new mongoose.Types.ObjectId(user._id));
+
         const [taskStats, users] = await Promise.all([
             Task.aggregate([
+                {
+                    $match: {
+                        "assignedTo._id": { $in: usersId },
+                    },
+                },
                 {
                     $addFields: {
                         isOverdue: {
@@ -43,6 +66,11 @@ export const getCombinedStatistics = asyncHandler(async (req, res, next) => {
             ]),
 
             User.aggregate([
+                {
+                    $match: {
+                        _id: { $in: usersId },
+                    },
+                },
                 {
                     $lookup: {
                         from: "tasks",
@@ -100,6 +128,7 @@ export const getCombinedStatistics = asyncHandler(async (req, res, next) => {
                                     cond: {
                                         $and: [
                                             { $ne: ["$$task.status", "Completed"] },
+                                            { $ne: ["$$task.status", "Deleted"] },
                                             { $lt: ["$$task.dueDate", new Date()] },
                                         ],
                                     },
@@ -110,6 +139,7 @@ export const getCombinedStatistics = asyncHandler(async (req, res, next) => {
                 },
             ]),
         ]);
+
         taskStats.forEach((task) => {
             taskStatistics[task._id] = task.count;
             taskStatistics["totalTasks"] += task.count;
@@ -126,7 +156,7 @@ export const getCombinedStatistics = asyncHandler(async (req, res, next) => {
             new apiResponse(200, combinedResponse, "Task and user statistics fetched successfully")
         );
     } catch (err) {
-        return next(new errorHandler(500, err.message));
+        res.json(500).json(new errorHandler(500, err.message));
     }
 });
 

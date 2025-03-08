@@ -47,6 +47,7 @@ export const createTask = asyncHandler(async (req, res) => {
                       name: assignedUser.name,
                       email: assignedUser.email,
                       role: assignedUser.role,
+                      companyName: assignedUser.companyName,
                   }
                 : null,
             assignedBy: {
@@ -54,6 +55,7 @@ export const createTask = asyncHandler(async (req, res) => {
                 name: creator.name,
                 email: creator.email,
                 role: creator.role,
+                companyName: creator.companyName,
             },
             projectId,
             taskCategory,
@@ -100,42 +102,28 @@ export const createTask = asyncHandler(async (req, res) => {
 
 export const getAllTasks = asyncHandler(async (req, res) => {
     try {
-        const tasks = await Task.find({
-            status: { $nin: ["Close", "Deleted"] },
-        })
-            .populate("assignedTo", "name email role")
-            .populate("assignedBy", "name email role")
-            .exec();
+        const { _id } = req.user;
+        const checkRole = await User.findById(_id).select("-password -accessToken -refreshToken");
+
+        let tasks;
+        if (checkRole.role === "Admin") {
+            tasks = await Task.find({
+                status: { $nin: ["Close", "Deleted"] },
+                "assignedTo.companyName": checkRole.companyName,
+            }).exec();
+        } else if (checkRole.role === "Employee") {
+            tasks = await Task.find({
+                status: { $nin: ["Close", "Deleted"] },
+                "assignedTo._id": new mongoose.Types.ObjectId(_id),
+            })
+                .populate("assignedTo", "name email role")
+                .populate("assignedBy", "name email role")
+                .exec();
+        }
 
         res.status(200).json(new apiResponse(200, tasks, "Tasks fetched successfully."));
     } catch (error) {
         throw new errorHandler(500, "Something went wrong.");
-    }
-});
-
-export const getTaskById = asyncHandler(async (req, res) => {
-    try {
-        const { taskId } = req.params;
-
-        const task = await Task.findById(taskId)
-            .populate("assignedTo", "name email role")
-            .populate("assignedBy", "name email role")
-            .exec();
-
-        if (!task) {
-            throw new errorHandler(404, "Task not found");
-        }
-
-        const [comments, history] = await Promise.all([
-            Comment.find({ taskId }).populate("assignedBy", "name email"),
-            History.find({ taskId }).populate("assignedBy", "name email"),
-        ]);
-
-        res.status(200).json(
-            new apiResponse(200, { task, comments, history }, "Task details retrieved successfully")
-        );
-    } catch (error) {
-        throw new errorHandler(500, error.message);
     }
 });
 
@@ -166,8 +154,10 @@ export const updateTask = asyncHandler(async (req, res) => {
 
     const [userChanger, previousAssignee, newAssignee] = await Promise.all([
         User.findById(userId).select("name"),
-        task.assignedTo?._id ? User.findById(task.assignedTo._id).select("name email") : null,
-        assignedTo ? User.findById(assignedTo).select("_id name email role") : null,
+        task.assignedTo?._id
+            ? User.findById(task.assignedTo._id).select("name email companyName")
+            : null,
+        assignedTo ? User.findById(assignedTo).select("_id name email role companyName") : null,
     ]);
 
     const userName = userChanger?.name || "Unknown User";
@@ -214,6 +204,7 @@ export const updateTask = asyncHandler(async (req, res) => {
             name: newAssignee.name,
             email: newAssignee.email,
             role: newAssignee.role,
+            companyName: newAssignee.companyName,
         };
 
         if (newAssignee.email) emailsToNotify.add(newAssignee.email);
