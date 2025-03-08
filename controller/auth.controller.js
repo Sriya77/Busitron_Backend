@@ -16,10 +16,10 @@ import bcrypt from "bcryptjs";
 
 export const registerUser = asyncHandler(async (req, res) => {
     try {
-        const { email, designation, employeeId, message } = req.body;
+        const { email, designation, employeeId, companyName, message } = req.body;
         const password = generateRandomPassword();
 
-        if (!email || !password || !designation || !employeeId) {
+        if (!email || !password || !designation || !companyName || !employeeId) {
             throw new errorHandler(400, "Required fields are missing");
         }
 
@@ -34,6 +34,7 @@ export const registerUser = asyncHandler(async (req, res) => {
             password,
             designation,
             employeeId,
+            companyName,
             message,
         });
 
@@ -46,7 +47,7 @@ export const registerUser = asyncHandler(async (req, res) => {
         res.status(201).json(
             new apiResponse(
                 201,
-                { id: user._id, email, designation, employeeId, message },
+                { id: user._id, email, designation, employeeId, companyName, message },
                 "Registered successfully"
             )
         );
@@ -92,8 +93,12 @@ export const loginUser = asyncHandler(async (req, res) => {
 
         const { password: pass, ...rest } = user._doc;
 
-        res.cookie("accessToken", accessToken)
-            .cookie("refreshToken", refreshToken)
+        res.cookie("accessToken", accessToken, {
+            maxAge: 24 * 60 * 60 * 1000,
+        })
+            .cookie("refreshToken", refreshToken, {
+                maxAge: 24 * 60 * 60 * 1000,
+            })
             .status(200)
             .json(new apiResponse(200, rest, "Login successful"));
     } catch (error) {
