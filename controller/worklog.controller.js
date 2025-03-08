@@ -1,7 +1,7 @@
 import { errorHandler } from "../utils/errorHandle.js";
 import { asyncHandler } from "../utils/asyncHandle.js";
 import { apiResponse } from "../utils/apiResponse.js";
-import { User } from "../models/user.models.js";
+import User from "../models/user.models.js";
 import { Worklog } from "../models/worklog.models.js";
 import Task from "../models/task.models.js";
 

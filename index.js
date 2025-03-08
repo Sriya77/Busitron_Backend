@@ -8,7 +8,7 @@ import http from "http";
 const server = http.createServer(app);
 // registerSocketServer(server);
 
-console.log("REG_SOCKET:",registerSocketServer(server))
+// console.log("REG_SOCKET:",registerSocketServer(server))
 
 dotenv.config({ path: "./.env" });
 

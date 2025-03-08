@@ -1,6 +1,6 @@
 import { sendTaskEmail } from "../helper/sendTaskEmail.js";
 import { Ticket } from "../models/ticket.models.js";
-import { User } from "../models/user.models.js";
+import User from "../models/user.models.js";
 import { uploadToS3 } from "../services/aws.service.js";
 import { apiResponse } from "../utils/apiResponse.js";
 import { asyncHandler } from "../utils/asyncHandle.js";
