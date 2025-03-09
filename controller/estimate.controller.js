@@ -98,6 +98,33 @@ export const getAllEstimates = asyncHandler(async (req, res, next) => {
         new errorHandler(error.message || "Internal Server Error", 500);
     }
 });
+
+// export const getAllEstimates = asyncHandler(async (req, res, next) => {
+//     try {
+//         const userId = req.user.id; // Assuming you have user info in req.user
+//         const userRole = req.user.role; // Assuming you have user role in req.user
+
+//         let estimates;
+//         if (userRole === 'superAdmin') {
+//             estimates = await Estimate.find()
+//                 .populate({ path: "clientId", select: "name" })
+//                 .populate({ path: "userId", select: "name" })
+//                 .sort({ createdAt: -1 });
+//         } else if (userRole === 'admin') {
+//             estimates = await Estimate.find({ userId: userId }) // Filter by userId
+//                 .populate({ path: "clientId", select: "name" })
+//                 .populate({ path: "userId", select: "name" })
+//                 .sort({ createdAt: -1 });
+//         } else {
+//             return res.status(403).json(new apiResponse(403, null, "Access denied."));
+//         }
+
+//         return res.status(200).json(new apiResponse(200, estimates, "All estimates retrieved successfully."));
+//     } catch (error) {
+//         new errorHandler(error.message || "Internal Server Error", 500);
+//     }
+// });
+
 export const getEstimateById = asyncHandler(async (req, res, next) => {
     try {
         const { id } = req.params;

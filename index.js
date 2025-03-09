@@ -6,7 +6,7 @@ import { registerSocketServer } from "./socketServer.js";
 import http from "http";
 
 const server = http.createServer(app);
-// registerSocketServer(server);
+registerSocketServer(server);
 
 // console.log("REG_SOCKET:",registerSocketServer(server))
 

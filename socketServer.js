@@ -11,15 +11,12 @@ import newMessageHandler from "./socketHandlers/newMessageHandler.js";
 import { upload } from "./middlewares/fileupload.middleware.js";
 
 export const registerSocketServer = (server) => {
-    console.log(server,"SERVER")
     const io = new Server(server, {
         cors: {
             origin: "*",
             methods: ["GET", "POST"],
         },
     });
-
-    console.log(io,"IO")
 
     // Authenticate socket connection
     io.use(authSocket);

@@ -3,39 +3,30 @@ import { asyncHandler } from "../utils/asyncHandle.js";
 import { errorHandler } from "../utils/errorHandle.js";
 import Conversation from "../models/conversation.models.js";
 import User from "../models/user.models.js";
-import {uploadToS3} from "../services/aws.service.js"
+import { uploadToS3 } from "../services/aws.service.js";
 
 // GET ME
 export const getEmployee = asyncHandler(async (req, res, next) => {
-   try{
-    res.status(200).json({
-        status: "success",
-        message: "User Info found successfully!",
-        data: {
-          user: req.user,
-        },
-      });
-   }catch(err){
-    throw new errorHandler(500, err.message);
-   }
-  });
-
+    try {
+        res.status(200).json({
+            status: "success",
+            message: "User Info found successfully!",
+            data: {
+                user: req.user,
+            },
+        });
+    } catch (err) {
+        throw new errorHandler(500, err.message);
+    }
+});
 
 // GET USERS
 export const allEmployees = asyncHandler(async (req, res, next) => {
     try {
-
         const { _id } = req.user;
-        const other_users = await User.find({ _id: { $ne: _id } }).select(
-            "name _id avatar"
-        );
+        const other_users = await User.find({ _id: { $ne: _id } }).select("name _id avatar");
 
-        res.json( new apiResponse(
-            200,
-            { other_users },
-            "Users found successfully!"
-        ))
-       
+        res.json(new apiResponse(200, { other_users }, "Users found successfully!"));
     } catch (err) {
         throw new errorHandler(500, err.message);
     }
@@ -55,7 +46,6 @@ export const startConversation = asyncHandler(async (req, res, next) => {
             .populate("participants");
 
         if (conversation) {
-
             return res.json(new apiResponse(200, { conversation }, "success"));
         } else {
             // Create a new conversation
@@ -67,18 +57,12 @@ export const startConversation = asyncHandler(async (req, res, next) => {
                 .populate("messages")
                 .populate("participants");
 
-            return new apiResponse(
-                201,
-                { conversation: newConversation },
-                "success"
-            );
+            return new apiResponse(201, { conversation: newConversation }, "success");
         }
     } catch (err) {
         throw new errorHandler(500, err.message);
     }
 });
-
-
 
 // GET CONVERSATIONS
 export const getConversations = asyncHandler(async (req, res, next) => {
@@ -97,31 +81,26 @@ export const getConversations = asyncHandler(async (req, res, next) => {
     }
 });
 
-
 //Upload Media files-->pending
 export const uploadMediaFiles = async (req, res) => {
     try {
-      if (!req.files || req.files.length === 0) {
-        return res.status(400).json({ success: false, message: "No files uploaded." });
-      }
+        if (!req.files || req.files.length === 0) {
+            return res.status(400).json({ success: false, message: "No files uploaded." });
+        }
 
-      if(req.files.length){
-        const uploadedFiles = await Promise.all(
-            req.files.map((file)=>
-            uploadToS3(file,`projects/${file.originalname}`))
-        )
+        if (req.files.length) {
+            const uploadedFiles = await Promise.all(
+                req.files.map((file) => uploadToS3(file, `projects/${file.originalname}`))
+            );
 
-        res.status(201).json({
-            success: true,
-            message: "Files uploaded successfully.",
-            files: uploadedFiles,
-          });
-      }
-  
-      
+            res.status(201).json({
+                success: true,
+                message: "Files uploaded successfully.",
+                files: uploadedFiles,
+            });
+        }
     } catch (error) {
-      console.error("Upload error:", error);
-      res.status(500).json({ success: false, message: "File upload failed." });
+        console.error("Upload error:", error);
+        res.status(500).json({ success: false, message: "File upload failed." });
     }
-  };
-  
+};
