@@ -99,6 +99,7 @@ export const getAllEstimates = asyncHandler(async (req, res, next) => {
                 clientId: _id,
             })
                 .populate({ path: "clientId", select: "name" })
+                .populate({ path: "userId", select: "name" })
                 .sort({ createdAt: -1 });
         }
 
