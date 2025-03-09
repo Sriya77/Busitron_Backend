@@ -16,8 +16,11 @@ export const getUserData = asyncHandler(async (req, res) => {
 
 		const currentDate = new Date();
 		let pendingTasks = 0,
-			overdueTasks = 0;
+			overdueTasks = 0,
+			projectPending = 0,
+			projectOverdue = 0;
 
+		
 		const allProjects = await projects
 			.find({
 				projectMembers: new mongoose.Types.ObjectId(userId),
@@ -26,12 +29,27 @@ export const getUserData = asyncHandler(async (req, res) => {
 
 		const projectCount = allProjects.length;
 
+		allProjects.forEach((project) => {
+			if (project.endDate) {
+				const endDate = new Date(project.endDate);
+				if (endDate < currentDate) {
+					projectOverdue += 1;
+				} else {
+					projectPending += 1;
+				}
+			} else {
+				projectPending += 1; 
+			}
+		});
+
+		
 		const userTasks = await Task.find({
 			"assignedTo._id": new mongoose.Types.ObjectId(userId),
 		}).lean();
 
 		const taskCount = userTasks.length;
 
+		
 		userTasks.forEach((task) => {
 			if (task.status !== "Completed" && task.status !== "Deleted") {
 				if (new Date(task.dueDate) < currentDate) {
@@ -42,6 +60,7 @@ export const getUserData = asyncHandler(async (req, res) => {
 			}
 		});
 
+		
 		const userTickets = await Ticket.find({
 			"assignedBy._id": new mongoose.Types.ObjectId(userId),
 		}).lean();
@@ -55,6 +74,13 @@ export const getUserData = asyncHandler(async (req, res) => {
 					taskCount,
 					ticketCount,
 					projectCount,
+					pendingTasks,
+					overdueTasks,
+					projectPending,
+					projectOverdue,
+					userTasks,
+					userTickets,
+					allProjects,
 				},
 				"User tasks, tickets, and projects fetched successfully"
 			)

@@ -1,4 +1,4 @@
-import  User  from "../models/user.models.js";
+import User from "../models/user.models.js";
 import { apiResponse } from "../utils/apiResponse.js";
 import { asyncHandler } from "../utils/asyncHandle.js";
 import { errorHandler } from "../utils/errorHandle.js";
@@ -259,12 +259,12 @@ export const logoutUser = asyncHandler(async (req, res) => {
 export const changePassword = asyncHandler(async (req, res) => {
     try {
         const { newPassword, confirmPassword } = req.body;
-        const { _id } = req.user._id;
+        const loggedInUser = req.user;
 
         if (!newPassword || !confirmPassword)
             throw new errorHandler(400, "All fields are required");
 
-        const user = await User.findById(_id);
+        const user = await User.findById(loggedInUser._id);
 
         if (!user) throw new errorHandler(404, "user not found");
 
@@ -274,7 +274,7 @@ export const changePassword = asyncHandler(async (req, res) => {
         const salt = await bcrypt.genSalt(10);
         const hashedPassword = await bcrypt.hash(newPassword, salt);
 
-        await User.findByIdAndUpdate(_id, { password: hashedPassword });
+        await User.findByIdAndUpdate(user._id, { password: hashedPassword });
 
         res.status(200).json(new apiResponse(200, null, "Your password has successfully changed."));
     } catch (err) {
