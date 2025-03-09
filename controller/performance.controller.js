@@ -215,10 +215,11 @@ export const getParticularUserTask = asyncHandler(async (req, res) => {
                 dueTasks += 1;
             }
         }
+
         res.status(200).json(
             new apiResponse(
                 200,
-                { totalTasks, completedTasks, pendingTasks, dueTasks, getTasks, todo },
+                { totalTasks, completedTasks, pendingTasks, dueTasks, getTasks, todo, inprogress },
                 "task fetched successfully"
             )
         );

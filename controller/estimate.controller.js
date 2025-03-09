@@ -82,15 +82,26 @@ export const createEstimate = asyncHandler(async (req, res) => {
         throw new errorHandler(error.message || 500, "Internal Server Error");
     }
 });
+
 export const getAllEstimates = asyncHandler(async (req, res, next) => {
     try {
-        const estimates = await Estimate.find()
-            .populate({
-                path: "clientId",
-                select: "name",
+        const { _id } = req.user;
+        const checkRole = await User.findById(_id).select("-password -accessToken -refreshToken");
+
+        let estimates;
+        if (checkRole.role === "SuperAdmin") {
+            estimates = await Estimate.find()
+                .populate({ path: "clientId", select: "name" })
+                .populate({ path: "userId", select: "name" })
+                .sort({ createdAt: -1 });
+        } else if (checkRole.role === "Admin") {
+            estimates = await Estimate.find({
+                clientId: _id,
             })
-            .populate({ path: "userId", select: "name" })
-            .sort({ createdAt: -1 });
+                .populate({ path: "clientId", select: "name" })
+                .sort({ createdAt: -1 });
+        }
+
         return res
             .status(200)
             .json(new apiResponse(200, estimates, "All estimates retrieved successfully."));
@@ -98,32 +109,6 @@ export const getAllEstimates = asyncHandler(async (req, res, next) => {
         new errorHandler(error.message || "Internal Server Error", 500);
     }
 });
-
-// export const getAllEstimates = asyncHandler(async (req, res, next) => {
-//     try {
-//         const userId = req.user.id; // Assuming you have user info in req.user
-//         const userRole = req.user.role; // Assuming you have user role in req.user
-
-//         let estimates;
-//         if (userRole === 'superAdmin') {
-//             estimates = await Estimate.find()
-//                 .populate({ path: "clientId", select: "name" })
-//                 .populate({ path: "userId", select: "name" })
-//                 .sort({ createdAt: -1 });
-//         } else if (userRole === 'admin') {
-//             estimates = await Estimate.find({ userId: userId }) // Filter by userId
-//                 .populate({ path: "clientId", select: "name" })
-//                 .populate({ path: "userId", select: "name" })
-//                 .sort({ createdAt: -1 });
-//         } else {
-//             return res.status(403).json(new apiResponse(403, null, "Access denied."));
-//         }
-
-//         return res.status(200).json(new apiResponse(200, estimates, "All estimates retrieved successfully."));
-//     } catch (error) {
-//         new errorHandler(error.message || "Internal Server Error", 500);
-//     }
-// });
 
 export const getEstimateById = asyncHandler(async (req, res, next) => {
     try {
