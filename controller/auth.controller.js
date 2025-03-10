@@ -16,7 +16,7 @@ import bcrypt from "bcryptjs";
 
 export const registerUser = asyncHandler(async (req, res) => {
     try {
-        const { email, designation, employeeId, companyName, message } = req.body;
+        const { email, designation, role, employeeId, companyName, message } = req.body;
         const password = generateRandomPassword();
 
         if (!email || !password || !designation || !companyName || !employeeId) {
@@ -33,6 +33,7 @@ export const registerUser = asyncHandler(async (req, res) => {
             email,
             password,
             designation,
+            role,
             employeeId,
             companyName,
             message,
