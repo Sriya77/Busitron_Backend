@@ -145,7 +145,7 @@ export const getAllTaskByUser = asyncHandler(async (req, res) => {
 
 export const updateTask = asyncHandler(async (req, res) => {
     const { taskId } = req.params;
-    const { title, dueDate, taskCategory, label, assignedTo, description, priority, status } =
+    const { title, dueDate, taskCategory, label, assignedTo, description, priority, status, projectId } =
         req.body;
     const userId = req.user._id;
 
@@ -173,6 +173,7 @@ export const updateTask = asyncHandler(async (req, res) => {
         dueDate,
         taskCategory,
         label,
+        projectId,
     };
     Object.entries(updateFields).forEach(([field, newValue]) => {
         if (newValue && newValue !== task[field]) {
