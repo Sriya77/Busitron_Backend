@@ -2,7 +2,6 @@ import { Server } from "socket.io";
 
 import authSocket from "./middlewares/authSocket.middleware.js";
 
-// Socket Handlers
 import disconnectHandler from "./socketHandlers/disconnectHandler.js";
 import chatHistoryHandler from "./socketHandlers/getMessageHistoryHandler.js";
 import newConnectionHandler from "./socketHandlers/newConnectionHandler.js";
@@ -18,7 +17,6 @@ export const registerSocketServer = (server) => {
         },
     });
 
-    // Authenticate socket connection
     io.use(authSocket);
 
     io.on("connection", (socket) => {
